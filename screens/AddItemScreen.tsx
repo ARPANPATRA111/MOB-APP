@@ -212,7 +212,38 @@ const AddItemScreen: React.FC<AddItemScreenProps> = ({ navigation }) => {
                       Existing product - update quantity
                     </Text>
                   )}
+
+<View style={styles.inputContainer}>
+                    <Text style={styles.inputLabel}>Name:</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={itemName}
+                      onChangeText={setItemName}
+                      placeholder="Enter product name"
+                    />
+                  </View>
                   
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.inputLabel}>Quantity:</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={quantity}
+                      onChangeText={setQuantity}
+                      keyboardType="number-pad"
+                      placeholder="Enter quantity"
+                    />
+                  </View>
+                  
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.inputLabel}>Price ($):</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={price}
+                      onChangeText={setPrice}
+                      keyboardType="decimal-pad"
+                      placeholder="Enter price"
+                    />
+                  </View>
                   
                   {/* Image preview section */}
                   <View style={styles.imageSection}>
@@ -296,6 +327,37 @@ const styles = StyleSheet.create({
     padding: 20,
     width: '100%',
   },
+  itemTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 20,
+  },
+  itemText: {
+    fontSize: 18,
+    marginBottom: 10,
+  },
+  existingProductText: {
+    fontSize: 16,
+    color: '#4a89dc',
+    fontWeight: 'bold',
+    marginBottom: 15,
+    backgroundColor: '#e0f0ff',
+    padding: 8,
+    borderRadius: 6,
+    width: '100%',
+    textAlign: 'center',
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 10,
+    width: '100%',
+  },
+  inputLabel: {
+    fontSize: 18,
+    width: 100,
+  },
+
 });
 
 export default AddItemScreen;
