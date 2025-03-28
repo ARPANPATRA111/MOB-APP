@@ -102,6 +102,36 @@ const InventoryScreen: React.FC = () => {
     setIsModalVisible(true);
   };
 
+  // Function to pick an image from the device gallery
+  const pickImage = async () => {
+    try {
+      // Request permission to access the photo library
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Please grant camera roll permissions to change product image');
+        return;
+      }
+      
+      // Open image picker
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const selectedAsset = result.assets[0];
+        if (selectedItem) {
+          await updateProductImage(selectedItem.barcode, selectedAsset.uri);
+        }
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to select image');
+    }
+  };
 
   // Function to update product image
   const updateProductImage = async (barcode: string, sourceUri: string) => {
@@ -158,6 +188,47 @@ const InventoryScreen: React.FC = () => {
     }
   };
 
+  const saveItemChanges = () => {
+    if (!selectedItem) return;
+    
+    if (!editedName.trim()) {
+      Alert.alert('Error', 'Please enter a product name');
+      return;
+    }
+    
+    const priceValue = parseFloat(editedPrice);
+    if (isNaN(priceValue) || priceValue < 0) {
+      Alert.alert('Error', 'Please enter a valid price');
+      return;
+    }
+    
+    const quantityValue = parseInt(editedQuantity);
+    if (isNaN(quantityValue) || quantityValue < 0) {
+      Alert.alert('Error', 'Please enter a valid quantity');
+      return;
+    }
+    
+    const updatedItem: Item = {
+      ...selectedItem,
+      name: editedName,
+      price: priceValue,
+      quantity: quantityValue
+    };
+    
+    const updatedInventory = inventory.map(item => 
+      item.barcode === selectedItem.barcode ? updatedItem : item
+    );
+    
+    saveInventory(updatedInventory);
+    setIsModalVisible(false);
+    setSelectedItem(null);
+  };
+
+  const openRemoveModal = () => {
+    if (!selectedItem) return;
+    setRemoveQuantity('');
+    setIsRemoveModalVisible(true);
+  };
 
   const removeEntireItem = () => {
     if (!selectedItem) return;
