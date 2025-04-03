@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet , Modal, Image, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, FlatList, Alert, TextInput, Modal, Image, ScrollView } from 'react-native';
 import { CameraView } from 'expo-camera';
 import { StackNavigationProp } from '@react-navigation/stack';
 
@@ -8,6 +8,44 @@ type RootStackParamList = {
   Billing: undefined;
   BillReceipt: { billId: string };
 };
+
+type BillingScreenProps = {
+  navigation: StackNavigationProp<RootStackParamList, 'Billing'>;
+};
+
+interface Item {
+  barcode: string;
+  name: string;
+  quantity: number;
+  price: number;
+  image?: string; // URL or local path to image
+}
+
+interface ItemGroup {
+  name: string;
+  barcodes: string[];
+  quantity: number;
+  price: number;
+  image?: string; // URL or local path to image
+}
+
+interface BillItem {
+  id: string;
+  name: string;
+  quantity: number;
+  price: number;
+  total: number;
+  image?: string; // URL or local path to image
+}
+
+interface Bill {
+  id: string;
+  items: BillItem[];
+  total: number;
+  customerName: string;
+  timestamp: number;
+  paymentMethod: string;
+}
 
 const BillingScreen: React.FC<BillingScreenProps> = ({ navigation }) => {
   const [scanning, setScanning] = useState(false);
