@@ -54,6 +54,48 @@ const BillingScreen: React.FC<BillingScreenProps> = ({ navigation }) => {
   const [showItemsGallery, setShowItemsGallery] = useState(false);
 
 
+  useEffect(() => {
+    (async () => {
+      const { status } = await Camera.requestCameraPermissionsAsync();
+      setHasPermission(status === 'granted');
+      
+      // Load inventory data
+      loadInventory();
+      
+      // Load sound
+      await loadSound();
+    })();
+
+    return () => {
+      // Unload sound when component unmounts
+      if (sound.current) {
+        sound.current.unloadAsync();
+      }
+    };
+  }, []);
+
+  const loadSound = async () => {
+    try {
+      const { sound: scanSound } = await Audio.Sound.createAsync(
+        require('../assets/BEEP_SOUND.mp3')
+      );
+      sound.current = scanSound;
+    } catch (error) {
+      console.error('Failed to load sound', error);
+    }
+  };
+
+  const playSound = async () => {
+    if (sound.current) {
+      try {
+        await sound.current.setPositionAsync(0); // Reset sound to beginning
+        await sound.current.playAsync();
+      } catch (error) {
+        console.error('Failed to play sound', error);
+      }
+    }
+  };
+
 
   return (
     <SafeAreaView style={styles.container}>
