@@ -95,6 +95,38 @@ const BillingScreen: React.FC<BillingScreenProps> = ({ navigation }) => {
       }
     }
   };
+  const loadInventory = async () => {
+    try {
+      const inventoryJSON = await AsyncStorage.getItem('inventory');
+      const groupedInventoryJSON = await AsyncStorage.getItem('groupedInventory');
+      
+      if (inventoryJSON) {
+        const loadedInventory = JSON.parse(inventoryJSON);
+        setInventory(loadedInventory);
+        setFilteredItems(loadedInventory);
+      }
+      
+      if (groupedInventoryJSON) {
+        setGroupedInventory(JSON.parse(groupedInventoryJSON));
+      }
+    } catch (error) {
+      console.error('Error loading inventory:', error);
+      Alert.alert('Error', 'Failed to load inventory');
+    }
+  };
+
+  useEffect(() => {
+    const allItems = [...inventory, ...groupedInventory];
+    
+    if (searchQuery.trim() === '') {
+      setFilteredItems(allItems);
+    } else {
+      const filtered = allItems.filter(item => 
+        item.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setFilteredItems(filtered);
+    }
+  }, [searchQuery, inventory, groupedInventory]);
 
 
   return (
