@@ -13,21 +13,6 @@ type BillingScreenProps = {
   navigation: StackNavigationProp<RootStackParamList, 'Billing'>;
 };
 
-interface Item {
-  barcode: string;
-  name: string;
-  quantity: number;
-  price: number;
-  image?: string; // URL or local path to image
-}
-
-interface ItemGroup {
-  name: string;
-  barcodes: string[];
-  quantity: number;
-  price: number;
-  image?: string; // URL or local path to image
-}
 
 interface BillItem {
   id: string;
@@ -49,8 +34,6 @@ interface Bill {
 
 const BillingScreen: React.FC<BillingScreenProps> = ({ navigation }) => {
   const [scanning, setScanning] = useState(false);
-  const [customerName, setCustomerName] = useState('');
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showItemsGallery, setShowItemsGallery] = useState(false);
 
 
@@ -151,10 +134,6 @@ const BillingScreen: React.FC<BillingScreenProps> = ({ navigation }) => {
             }}
             onBarcodeScanned={handleBarCodeScanned}
           />
-          <TouchableOpacity
-            style={styles.closeButton}
-            onPress={() => setScanning(false)}
-          >
             <Text style={styles.closeButtonText}>✕</Text>
           </TouchableOpacity>
         </View>
@@ -170,14 +149,6 @@ const BillingScreen: React.FC<BillingScreenProps> = ({ navigation }) => {
             </TouchableOpacity>
           </View>
           
-          
-          <FlatList
-            data={filteredItems}
-            renderItem={renderInventoryItem}
-            keyExtractor={item => 'barcode' in item ? item.barcode : `group-${item.name}`}
-            numColumns={2}
-            contentContainerStyle={styles.galleryList}
-          />
         </View>
       ) : (
         <>
@@ -242,15 +213,7 @@ const BillingScreen: React.FC<BillingScreenProps> = ({ navigation }) => {
             <Text style={styles.modalTitle}>Complete Purchase</Text>
             
             <Text style={styles.modalLabel}>Customer Name (Optional)</Text>
-            <TextInput
-              style={styles.modalInput}
-              value={customerName}
-              onChangeText={setCustomerName}
-              placeholder="Enter customer name"
-            />
-        
             
-
           </View>
         </View>
       </Modal>

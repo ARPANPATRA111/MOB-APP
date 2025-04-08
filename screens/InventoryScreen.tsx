@@ -3,11 +3,6 @@ import {
   View, 
   Text, 
   StyleSheet, 
-  FlatList, 
-  TouchableOpacity, 
-  SafeAreaView, 
-  Alert, 
-  TextInput,
   Image,
   Modal,
   ScrollView,
@@ -32,8 +27,6 @@ const InventoryScreen: React.FC = () => {
   const [isRemoveModalVisible, setIsRemoveModalVisible] = useState(false);
   const [editedName, setEditedName] = useState('');
   const [editedPrice, setEditedPrice] = useState('');
-  const [editedQuantity, setEditedQuantity] = useState('');
-  const [removeQuantity, setRemoveQuantity] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [imageCache, setImageCache] = useState<{[key: string]: boolean}>({});
@@ -295,8 +288,6 @@ const InventoryScreen: React.FC = () => {
         )}
         <View style={styles.itemDetails}>
           <Text style={styles.itemName}>{item.name}</Text>
-          <Text style={styles.itemPrice}>${item.price.toFixed(2)}</Text>
-          <Text style={styles.itemBarcode}>Barcode: {item.barcode}</Text>
           <Text style={styles.itemQuantity}>In stock: {item.quantity}</Text>
         </View>
       </View>
@@ -322,18 +313,6 @@ const InventoryScreen: React.FC = () => {
           onChangeText={setSearchQuery}
         />
       </View>
-      
-      <FlatList
-        data={filteredInventory}
-        renderItem={renderItem}
-        keyExtractor={item => item.barcode}
-        contentContainerStyle={styles.listContainer}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No items in inventory</Text>
-          </View>
-        }
-      />
       
       {/* Edit Item Modal */}
       <Modal
@@ -382,15 +361,6 @@ const InventoryScreen: React.FC = () => {
                 placeholder="Product Name"
               />
               
-              <Text style={styles.inputLabel}>Price ($)</Text>
-              <TextInput
-                style={styles.input}
-                value={editedPrice}
-                onChangeText={setEditedPrice}
-                keyboardType="numeric"
-                placeholder="0.00"
-              />
-              
               <Text style={styles.inputLabel}>Quantity</Text>
               <TextInput
                 style={styles.input}
@@ -408,19 +378,6 @@ const InventoryScreen: React.FC = () => {
                   <Text style={styles.buttonText}>Cancel</Text>
                 </TouchableOpacity>
                 
-                <TouchableOpacity
-                  style={[styles.button, styles.removeButton]}
-                  onPress={openRemoveModal}
-                >
-                  <Text style={styles.buttonText}>Remove</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={[styles.button, styles.saveButton]}
-                  onPress={saveItemChanges}
-                >
-                  <Text style={styles.buttonText}>Save</Text>
-                </TouchableOpacity>
               </View>
             </ScrollView>
           </View>
@@ -491,15 +448,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-  },
-  itemContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  productImage: {
-    width: 100,
-    height: 100,
-    backgroundColor: '#f0f0f0',
   },
   productImagePlaceholder: {
     width: 100,
