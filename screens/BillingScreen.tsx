@@ -141,12 +141,6 @@ const BillingScreen: React.FC<BillingScreenProps> = ({ navigation }) => {
         <View style={styles.galleryContainer}>
           <View style={styles.galleryHeader}>
             <Text style={styles.galleryTitle}>Available Items</Text>
-            <TouchableOpacity
-              style={styles.closeGalleryButton}
-              onPress={() => setShowItemsGallery(false)}
-            >
-              <Text style={styles.closeButtonText}>✕</Text>
-            </TouchableOpacity>
           </View>
           
         </View>
@@ -210,11 +204,7 @@ const BillingScreen: React.FC<BillingScreenProps> = ({ navigation }) => {
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Complete Purchase</Text>
-            
-            <Text style={styles.modalLabel}>Customer Name (Optional)</Text>
-            
-          </View>
+            <Text style={styles.modalTitle}>Payment</Text>
         </View>
       </Modal>
     </SafeAreaView>

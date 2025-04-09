@@ -31,13 +31,6 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation }) => {
         
         <TouchableOpacity
           style={styles.button}
-          onPress={() => navigation.navigate('Inventory')}
-        >
-          <Text style={styles.buttonText}>Check Inventory</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={styles.button}
           onPress={() => navigation.navigate('Billing')}
         >
           <Text style={styles.buttonText}>Bill Customer</Text>

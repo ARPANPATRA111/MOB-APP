@@ -264,10 +264,6 @@ const InventoryScreen: React.FC = () => {
     );
   };
 
-  const filteredInventory = inventory.filter(item => 
-    item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.barcode.includes(searchQuery)
-  );
 
   const renderItem = ({ item }: { item: Item }) => (
     <TouchableOpacity 
@@ -421,18 +417,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: '#fff',
-  },
-  searchContainer: {
-    padding: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  searchInput: {
-    backgroundColor: '#f0f0f0',
-    borderRadius: 8,
-    padding: 10,
-    fontSize: 16,
   },
   listContainer: {
     padding: 8,

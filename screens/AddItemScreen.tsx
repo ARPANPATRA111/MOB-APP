@@ -443,17 +443,6 @@ const AddItemScreen: React.FC<AddItemScreenProps> = ({ navigation }) => {
                     />
                   </View>
                   
-                  <View style={styles.inputContainer}>
-                    <Text style={styles.inputLabel}>Price ($):</Text>
-                    <TextInput
-                      style={styles.input}
-                      value={price}
-                      onChangeText={setPrice}
-                      keyboardType="decimal-pad"
-                      placeholder="Enter price"
-                    />
-                  </View>
-                  
                   {/* Image preview section */}
                   <View style={styles.imageSection}>
                     <TouchableOpacity 
