@@ -6,6 +6,18 @@ import { Text } from 'react-native';
 import DashboardScreen from './screens/DashboardScreen';
 import AddItemScreen from './screens/AddItemScreen';
 import InventoryScreen from './screens/InventoryScreen';
+import BillingScreen from './screens/BillingScreen';
+import BillReceiptScreen from './screens/BillReceiptScreen';
+import ErrorBoundary from './ErrorBoundary';
+
+// Define our stack navigator parameter list
+type RootStackParamList = {
+  Dashboard: undefined;
+  AddItem: undefined;
+  Inventory: undefined;
+  Billing: undefined;
+  BillReceipt: { billId: string };
+};
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -45,7 +57,16 @@ const App = () => {
             component={InventoryScreen} 
             options={{ title: 'Inventory' }}
           />
-
+          <Stack.Screen 
+            name="Billing" 
+            component={BillingScreen} 
+            options={{ title: 'Billing' }}
+          />
+          <Stack.Screen 
+            name="BillReceipt" 
+            component={BillReceiptScreen} 
+            options={{ title: 'Receipt' }}
+          />
         </Stack.Navigator>
       </NavigationContainer>
     </ErrorBoundary>
