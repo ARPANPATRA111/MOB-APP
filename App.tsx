@@ -1,3 +1,5 @@
+// App.tsx
+
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator, TransitionPresets } from '@react-navigation/stack';
@@ -10,7 +12,7 @@ import BillingScreen from './screens/BillingScreen';
 import BillReceiptScreen from './screens/BillReceiptScreen';
 import AboutScreen from './screens/AboutScreen';
 import SettingsScreen from './screens/SettingsScreen';
-import ReportsScreen from './screens/ReportsScreen'; // Make sure this import matches your file name
+import ReportsScreen from './screens/ReportsScreen';
 
 export type RootStackParamList = {
   Dashboard: undefined;
@@ -20,7 +22,7 @@ export type RootStackParamList = {
   BillReceipt: { billId: string };
   About: undefined;
   Settings: undefined;
-  Reports: undefined; // Changed from 'Report' to 'Reports' to match your navigator
+  Reports: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
