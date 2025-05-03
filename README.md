@@ -1,6 +1,7 @@
 # MOB-App (Mobile Operated Point of Sale App)
 
-![App Logo](./assets/icon.png)  
+<img src="./assets/adaptive-icon.png" width="350" height="350">
+
 *A lightweight, offline-first POS system for small businesses*
 
 ## 📌 Key Features
