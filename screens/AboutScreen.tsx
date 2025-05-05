@@ -60,7 +60,7 @@ const AboutScreen: React.FC = () => {
             <Ionicons name="call" size={24} color="#fff" />
             <Text style={styles.contactText}>9111155305</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.contactItem} onPress={handleWhatsAppPress}>
+          <TouchableOpacity style={styles.contactItem} onPress={handleWhatsAppPress}>k
             <Ionicons name="logo-whatsapp" size={24} color="#fff" />
             <Text style={styles.contactText}>Message on WhatsApp</Text>
           </TouchableOpacity>
