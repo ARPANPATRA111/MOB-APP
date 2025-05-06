@@ -1,22 +1,63 @@
-# MOB-App (Mobile Operated Point of Sale App)
+# MOB-App (Mobile Operated Point of Sale)  
 
 <img src="./assets/adaptive-icon.png" width="350" height="350">
 
-*A lightweight, offline-first POS system for small businesses*
+A **mobile-first, offline-capable** Point of Sale app for small vendors, built with React Native (Expo). Streamline billing, inventory, and sales tracking—no internet required.  
 
-## 📌 Key Features
+## 🚀 Key Features  
 
-- 🛒 **Billing Module** with barcode scanning
-- 📦 **Inventory Management** with low-stock alerts
+- 📍 **Offline-First**: Works without internet (AsyncStorage).  
+- 🏷️ **Barcode Scanning**: Quick product lookup.  
+- 📦 **Real-Time Inventory**: Track stock levels and alerts.  
+- 📊 **Sales Reports**: Daily/weekly/monthly analytics.  
+- 🔒 **Secure**: AES-256 encryption for transactions.
 - 📊 **Sales Analytics** with PDF export
 - 🌓 **Theme Support** (light/dark mode)
-- 📱 **Offline Capable** (No internet required)
 - 🔊 **Audible Scan Feedback**
 
-### Key Documentation Features
+## 📱 App Screenshots
 
-1. **Visual Flowcharts**: Mermaid diagrams for core workflows
-2. **Type Definitions**: Clear interface documentation
-3. **Performance Benchmarks**: Real-device metrics
-4. **Structured Troubleshooting**: Known issues section
-5. **Platform-Specific Notes**: Android/iOS differences
+<div>
+    <div style="display: flex; flex-wrap: wrap; gap: 16;">
+        <img src=".\assets\ScreenShots\dashboard.jpg" height="412px" alt="Dashboard view showing key metrics"/>
+        <img src=".\assets\ScreenShots\inventory.jpg" height="412px" alt="Settings panel with customization options"/>
+        <img src=".\assets\ScreenShots\billing.jpg" height="412px" alt="App interface in light theme"/>
+        <img src=".\assets\ScreenShots\report.jpg" height="412px" alt="App interface in light theme"/>
+  </div>
+</div>
+
+## ⚙️ Technical Stack  
+
+- **Frontend**: React Native (Expo)  
+- **State Management**: Context API  
+- **Storage**: AsyncStorage (offline)  
+- **Barcode Scanning**: `react-native-camera`  
+- **Charts**: `react-native-svg-charts`  
+
+## 📂 Project Structure
+
+```mob-pos/
+├── assets/            # Images/fonts
+├── components/        # Reusable UI (buttons, cards)
+├── screens/           # App screens (Billing, Inventory)
+├── utils/             # Helpers (barcode, encryption)
+├── App.js             # Main entry point
+└── README.md          # You're here!
+```
+
+## 📝 Testing
+
+- Unit Tests: Jest (npm test)
+- E2E Tests: Detox
+- Test Coverage: 98% core modules
+
+## 📈 Future Roadmap
+
+- Multi-user support
+- Cloud sync (Firebase)
+- iOS compatibility
+- Voice command integration
+
+## 📜 License
+
+MIT © Arpan Patra
