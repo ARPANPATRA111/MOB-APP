@@ -1,6 +1,6 @@
 # MOB-App (Mobile Operated Point of Sale)  
 
-<img src="./assets/adaptive-icon.png" width="350" height="350">
+![Banner](./assets/Banner.gif)
 
 A **mobile-first, offline-capable** Point of Sale app for small vendors, built with React Native (Expo). Streamline billing, inventory, and sales tracking—no internet required.  
 
@@ -20,9 +20,15 @@ A **mobile-first, offline-capable** Point of Sale app for small vendors, built w
 <div>
     <div style="display: flex; flex-wrap: wrap; gap: 16;">
         <img src=".\assets\ScreenShots\dashboard.jpg" height="412px" alt="Dashboard view showing key metrics"/>
+        <img src=".\assets\ScreenShots\additemscanner.jpg" height="412px" alt="App interface in light theme"/>
+        <img src=".\assets\ScreenShots\additemscreen.jpg" height="412px" alt="App interface in light theme"/>
         <img src=".\assets\ScreenShots\inventory.jpg" height="412px" alt="Settings panel with customization options"/>
         <img src=".\assets\ScreenShots\billing.jpg" height="412px" alt="App interface in light theme"/>
         <img src=".\assets\ScreenShots\report.jpg" height="412px" alt="App interface in light theme"/>
+        <img src=".\assets\ScreenShots\settings.jpg" height="412px" alt="App interface in light theme"/>
+        <img src=".\assets\ScreenShots\receipt.jpg" height="412px" alt="App interface in light theme"/>
+        <img src=".\assets\ScreenShots\payment.jpg" height="412px" alt="App interface in light theme"/>
+        <img src=".\assets\ScreenShots\about.jpg" height="412px" alt="App interface in light theme"/>
   </div>
 </div>
 
