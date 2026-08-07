@@ -1,0 +1,46 @@
+MOB guide
+
+Install and verify
+1. npm install
+2. npm run typecheck
+3. npx expo-doctor
+
+Run locally
+1. npx expo start --clear
+2. npx expo start --android
+3. npx expo run:android
+
+Windows non-interactive Expo start
+1. $env:CI=1; npx expo start --clear
+
+Metro and cache cleanup
+1. npx expo start --clear
+2. Remove-Item -Recurse -Force .expo,node_modules
+3. npm install
+
+Android debugging
+1. adb devices
+2. adb reverse tcp:8081 tcp:8081
+3. adb logcat | Select-String "ReactNativeJS|AndroidRuntime|Expo"
+
+Quality checks
+1. npm run typecheck
+2. npx expo-doctor
+
+EAS build
+1. npx eas login
+2. npx eas project:init
+3. npx eas build -p android --profile preview
+4. npx eas build -p android --profile production
+
+OTA updates
+1. npx eas update:configure
+2. npx eas update --channel preview --message "Preview OTA update"
+3. npx eas update --channel production --message "Production OTA update"
+
+Useful notes
+1. The app now uses EAS channels: development, preview, production.
+2. OTA updates require the project to be linked with EAS at least once through `npx eas project:init`.
+3. If Expo warns that `--non-interactive` is unsupported, use PowerShell CI mode: `$env:CI=1`.
+4. Keep `expo` pinned to a specific SDK version in `package.json`; do not switch it back to `latest`, or Expo Go can become incompatible again.
+5. If Expo Go on the phone is still too old for this SDK, update Expo Go from Play Store or use `npx expo run:android` to test with a development build instead of Expo Go.
