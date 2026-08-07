@@ -55,5 +55,6 @@ yarn-error.*
 *.keystore
 !android/app/debug.keystore
 keystore.properties
+credentials.json
 
 Making some changes to the project report today

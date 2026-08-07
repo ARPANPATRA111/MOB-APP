@@ -1,6 +1,3 @@
-```
-```
-
 # Privacy Policy for MOPX — Retail POS & Inventory
 
 **Last updated:** 7 August 2026
@@ -26,14 +23,14 @@ We cannot see your data. We have no server that holds it.
 MOPX stores the following **locally on your phone only**, inside the app's
 private storage area:
 
-| What                                                                             | Why                                      |
-| -------------------------------------------------------------------------------- | ---------------------------------------- |
-| Product names, barcodes, prices, stock counts, categories                        | To run your inventory                    |
-| Product photos you choose to attach                                              | To help you identify products            |
-| Bills, line items, totals, discounts, taxes, payment methods                     | To create and reprint receipts           |
-| Customer name and phone number,**when you choose to enter them on a bill** | To print them on that customer's receipt |
-| Your business profile (shop name, owner name, address, phone, GSTIN, currency)   | To print on receipts and invoices        |
-| App preferences (light/dark theme)                                               | To remember your settings                |
+| What | Why |
+| --- | --- |
+| Product names, barcodes, prices, stock counts, categories | To run your inventory |
+| Product photos you choose to attach | To help you identify products |
+| Bills, line items, totals, discounts, taxes, payment methods | To create and reprint receipts |
+| Customer name and phone number, **when you choose to enter them on a bill** | To print them on that customer's receipt |
+| Your business profile (shop name, owner name, address, phone, GSTIN, currency) | To print on receipts and invoices |
+| App preferences (light/dark theme) | To remember your settings |
 
 This information is **never transmitted to the developer or to any third
 party**. It stays on the device until you delete the app or clear its data.
@@ -43,10 +40,9 @@ party**. It stays on the device until you delete the app or clear its data.
 **Your business and customer data never leaves your device.**
 
 The only network communication MOPX performs is an over-the-air update check.
-When the app starts, it contacts Expo's update service
-(`u.expo.dev`, operated by Expo/650 Industries, Inc.) to ask whether a newer
-version of the app's code is available. This request includes technical
-information only:
+When the app starts, it contacts Expo's update service (`u.expo.dev`, operated
+by Expo / 650 Industries, Inc.) to ask whether a newer version of the app's code
+is available. This request includes technical information only:
 
 - A randomly generated installation identifier
 - The app version and update runtime version
@@ -59,16 +55,16 @@ Expo's privacy policy: https://expo.dev/privacy
 
 ## 3. Permissions the app requests
 
-| Permission                                      | Why it is needed                                    | Optional?                                             |
-| ----------------------------------------------- | --------------------------------------------------- | ----------------------------------------------------- |
-| **Camera**                                | To scan product barcodes and to take product photos | Yes — you can type barcodes manually and skip photos |
-| **Photos / Media** (Android 12 and below) | To attach an existing photo to a product            | Yes                                                   |
-| **Internet / Network state**              | Only for the update check described in section 2    | The app works fully offline without it                |
-| **Vibrate**                               | Scan feedback                                       | Yes                                                   |
+| Permission | Why it is needed | Optional? |
+| --- | --- | --- |
+| **Camera** | To scan product barcodes and to take product photos | Yes — you can type barcodes manually and skip photos |
+| **Photos / Media** (Android 12 and below) | To attach an existing photo to a product | Yes |
+| **Internet / Network state** | Only for the update check described in section 2 | The app works fully offline without it |
+| **Vibrate** | Scan feedback | Yes |
 
-MOPX does **not** request location, contacts, microphone, SMS, call logs, or
-any other sensitive permission. Camera frames are processed on the device to
-read barcodes and are never recorded, stored, or uploaded.
+MOPX does **not** request location, contacts, microphone, SMS, call logs, or any
+other sensitive permission. Camera frames are processed on the device to read
+barcodes and are never recorded, stored, or uploaded.
 
 ## 4. Children
 
@@ -79,8 +75,8 @@ at children and does not knowingly collect information from children.
 
 We do not sell your data. We do not share it. We do not have access to it.
 
-No advertising SDKs, analytics SDKs, or tracking libraries are included in
-this app.
+No advertising SDKs, analytics SDKs, or tracking libraries are included in this
+app.
 
 ## 6. Data retention and deletion
 
@@ -90,9 +86,9 @@ Because your data is stored only on your device, you control it completely:
 - **Delete all of it:** Uninstall the app, or go to Android
   Settings → Apps → MOPX → Storage → Clear storage
 
-Uninstalling the app permanently deletes all business data on that device.
-Since we hold no copy, there is nothing for us to delete on our side and no
-deletion request is necessary.
+Uninstalling the app permanently deletes all business data on that device. Since
+we hold no copy, there is nothing for us to delete on our side and no deletion
+request is necessary.
 
 **Important:** because there is no cloud backup, uninstalling or losing your
 phone means losing your data unless you have exported a backup file. Please
@@ -100,10 +96,10 @@ export backups regularly.
 
 ## 7. Security
 
-Your data is held in the app's private storage sandbox, which Android
-prevents other apps from reading. Backup files you export are ordinary files
-placed where you choose to share or save them — please keep them somewhere
-safe, as they contain your business and customer information in readable form.
+Your data is held in the app's private storage sandbox, which Android prevents
+other apps from reading. Backup files you export are ordinary files placed where
+you choose to share or save them — please keep them somewhere safe, as they
+contain your business and customer information in readable form.
 
 ## 8. Changes to this policy
 

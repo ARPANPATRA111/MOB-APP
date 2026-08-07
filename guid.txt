@@ -1,4 +1,4 @@
-MOB guide
+MOPX guide
 
 Install and verify
 1. npm install

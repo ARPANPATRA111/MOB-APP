@@ -7,7 +7,9 @@ Living checklist for the phase-gated production-hardening pass. Updated after ev
 - **Keep `android/`.** Do not delete or git-ignore it. Do not switch fully to managed workflow. Do not run `expo prebuild --clean`.
 - **No EAS builds, no AAB, no cloud quota, no keystore creation/modification** this pass. Local Android Studio + Gradle only.
 - **Finish with locally-built `app-debug.apk` + `app-release.apk`** via `android/gradlew`.
-- **Do not change the Android package/application ID** (`com.arpanpatra.mobapp`).
+- **Do not change the Android package/application ID** (`com.arpanpatra.mopx`).
+  It was renamed from `com.arpanpatra.mobapp` during the MOPX rebrand, before any
+  Play release. It is now frozen — changing it after publishing is impossible.
 - EAS / OTA / AAB / Play-signing = **documented future work only**.
 - **Worktree safety:** no `git reset`/`clean`/rebase/force; no commit/push; no branch create/switch while untracked work exists. Inspect every already-modified file before editing. Verify stale line numbers against current files.
 - **Phase gates:** don't advance if typecheck/lint/unit/migration/report tests fail, billing breaks, app can't bundle, or a native build regression appears. Mark device-only work `Code complete — physical-device QA pending` (never "verified" without a device).
