@@ -35,7 +35,7 @@ const AboutScreen: React.FC = () => {
       <AppCard theme={theme} style={styles.section}>
         <SectionHeader theme={theme} title="Purpose" />
         <Text style={styles.body}>
-          MOB is an offline-first retail app for small vendors and shopkeepers who need fast billing,
+          MOPX is an offline-first retail app for small vendors and shopkeepers who need fast billing,
           inventory tracking, receipts, and local reports without depending on internet access.
         </Text>
       </AppCard>

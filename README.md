@@ -1,6 +1,6 @@
-# MOB - Retail POS & Inventory
+# MOPX - Retail POS & Inventory
 
-MOB is an offline-first retail POS and inventory app for small vendors, shopkeepers, kiosks, and local retailers. It is built with React Native and Expo and focuses on practical store workflows: product entry, barcode-assisted lookup, inventory, billing, receipts, reports, theme preference, and local backup/export.
+MOPX is an offline-first retail POS and inventory app for small vendors, shopkeepers, kiosks, and local retailers. It is built with React Native and Expo and focuses on practical store workflows: product entry, barcode-assisted lookup, inventory, billing, receipts, reports, theme preference, and local backup/export.
 
 This repository is being modernized from a graduation-project codebase into a production-quality offline POS foundation. The revamp is intentionally phased: stabilize the repo first, modernize the local data layer, improve billing correctness, then redesign the core POS workflow.
 

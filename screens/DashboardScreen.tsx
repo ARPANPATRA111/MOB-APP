@@ -134,7 +134,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation }) => {
           return true;
         }
         lastBackPressRef.current = now;
-        toast.showToast({ message: 'Press back again to exit MOB', variant: 'neutral', duration: EXIT_WINDOW_MS });
+        toast.showToast({ message: 'Press back again to exit MOPX', variant: 'neutral', duration: EXIT_WINDOW_MS });
         return true;
       });
 

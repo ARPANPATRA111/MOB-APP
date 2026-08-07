@@ -117,9 +117,9 @@ const SettingsScreen: React.FC = () => {
         throw new Error('Device storage is unavailable');
       }
       const backup = await storageService.buildBackupSnapshot();
-      const fileUri = `${directory}moppos-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+      const fileUri = `${directory}mopx-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
       await FileSystem.writeAsStringAsync(fileUri, JSON.stringify(backup, null, 2));
-      await shareFile(fileUri, 'Share MOB backup');
+      await shareFile(fileUri, 'Share MOPX backup');
       toast.showToast({ message: 'Backup exported', variant: 'success' });
     } catch (error) {
       void dialog.alert({ title: 'Backup failed', message: (error as Error).message });
@@ -136,7 +136,7 @@ const SettingsScreen: React.FC = () => {
         throw new Error('Device storage is unavailable');
       }
       const csv = await storageService.exportProductsCsv();
-      const fileUri = `${directory}moppos-products-${new Date().toISOString().replace(/[:.]/g, '-')}.csv`;
+      const fileUri = `${directory}mopx-products-${new Date().toISOString().replace(/[:.]/g, '-')}.csv`;
       await FileSystem.writeAsStringAsync(fileUri, csv);
       await shareFile(fileUri, 'Share product CSV');
       toast.showToast({ message: 'Product CSV exported', variant: 'success' });
@@ -152,14 +152,14 @@ const SettingsScreen: React.FC = () => {
     try {
       const result = await Updates.checkForUpdateAsync();
       if (!result.isAvailable) {
-        toast.showToast({ message: 'MOB is up to date', variant: 'info' });
+        toast.showToast({ message: 'MOPX is up to date', variant: 'info' });
         return;
       }
 
       await Updates.fetchUpdateAsync();
       const restart = await dialog.confirm({
         title: 'Update ready',
-        message: 'Restart MOB to apply the downloaded update.',
+        message: 'Restart MOPX to apply the downloaded update.',
         confirmText: 'Restart',
         cancelText: 'Later',
       });

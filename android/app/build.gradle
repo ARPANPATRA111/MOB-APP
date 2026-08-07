@@ -87,14 +87,13 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.arpanpatra.mobapp'
+    namespace 'com.arpanpatra.mopx'
     defaultConfig {
-        applicationId 'com.arpanpatra.mobapp'
+        applicationId 'com.arpanpatra.mopx'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        // Keep in sync with expo.android.versionCode in app.json — this project
-        // has a committed android/ folder, so Gradle is the source of truth and
-        // app.json only mirrors it for the in-app "App info" screen.
+        // Baseline only. eas.json uses appVersionSource "remote", so EAS owns the
+        // real build number and injects it at build time — do not bump by hand.
         versionCode 2
         versionName "2.0.0"
 

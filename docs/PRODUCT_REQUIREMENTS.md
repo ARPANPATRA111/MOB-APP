@@ -2,7 +2,7 @@
 
 ## Product Intent
 
-MOB helps small vendors replace notebooks and manual stock tracking with an offline mobile POS. The minimum useful workflow is:
+MOPX helps small vendors replace notebooks and manual stock tracking with an offline mobile POS. The minimum useful workflow is:
 
 ```text
 add product -> search or scan product -> create bill -> stock decreases -> receipt opens -> report updates

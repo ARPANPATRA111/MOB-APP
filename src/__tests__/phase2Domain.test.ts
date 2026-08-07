@@ -66,7 +66,7 @@ describe('receipt formatting domain', () => {
   it('formats saved sales and escapes PDF receipt HTML', () => {
     const receipt = formatReceiptData(sale, {
       id: 'business-1',
-      businessName: 'MOB & Store',
+      businessName: 'MOPX & Store',
       address: 'Main Road',
       phone: '9999999999',
       gstin: '22AAAAA0000A1Z5',
@@ -77,7 +77,7 @@ describe('receipt formatting domain', () => {
     expect(receipt.total).toBe(99.75);
     expect(receipt.items[0].name).toBe('Rice <premium>');
     const html = createReceiptHtml(receipt);
-    expect(html).toContain('MOB &amp; Store');
+    expect(html).toContain('MOPX &amp; Store');
     expect(html).toContain('Rice &lt;premium&gt;');
   });
 });

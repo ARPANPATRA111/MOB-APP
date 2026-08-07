@@ -32,7 +32,7 @@ describe('official invoice formatting', () => {
   it('includes business, customer, payment, totals, and item table fields', () => {
     const receipt = formatReceiptData(sale, {
       id: 'business-1',
-      businessName: 'MOB Store',
+      businessName: 'MOPX Store',
       ownerName: 'Arpan Patra',
       phone: '9999999999',
       address: 'Main Road',

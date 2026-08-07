@@ -1,4 +1,4 @@
-# MOB — Production-Hardening Implementation Tracking
+# MOPX — Production-Hardening Implementation Tracking
 
 Living checklist for the phase-gated production-hardening pass. Updated after every phase.
 

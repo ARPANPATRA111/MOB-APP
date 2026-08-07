@@ -55,7 +55,7 @@ export const PLAN_DEFINITIONS: Record<PlanId, PlanDefinition> = {
     id: 'free',
     name: 'Free',
     priceHint: 'Rs. 0',
-    description: 'A generous offline starter plan for small shops to trust MOB before paying.',
+    description: 'A generous offline starter plan for small shops to trust MOPX before paying.',
     limits: { products: 200, billsPerMonth: 300 },
     features: {
       ...baseFeatures,

@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "MOB",
+    "name": "MOPX",
     "slug": "mob-app",
     "version": "2.0.0",
     "orientation": "portrait",
@@ -18,27 +18,27 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.arpanpatra.mobapp"
+      "bundleIdentifier": "com.arpanpatra.mopx"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.arpanpatra.mobapp"
+      "package": "com.arpanpatra.mopx"
     },
     "plugins": [
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow MOB to scan product barcodes."
+          "cameraPermission": "Allow MOPX to scan product barcodes."
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow MOB to attach product photos.",
-          "cameraPermission": "Allow MOB to take product photos."
+          "photosPermission": "Allow MOPX to attach product photos.",
+          "cameraPermission": "Allow MOPX to take product photos."
         }
       ],
       [

@@ -1,4 +1,4 @@
-package com.arpanpatra.mobapp
+package com.arpanpatra.mopx
 
 import android.os.Build
 import android.os.Bundle

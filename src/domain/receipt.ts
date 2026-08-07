@@ -45,7 +45,7 @@ export const formatReceiptData = (
   customerName: sale.customerName || 'Walk-in',
   customerPhone: sale.customerPhone,
   paymentSummary: sale.payments.map((payment) => payment.method).join(', ') || 'Cash',
-  businessName: businessProfile?.businessName || 'MOB Store',
+  businessName: businessProfile?.businessName || 'MOPX Store',
   ownerName: businessProfile?.ownerName,
   businessAddress: businessProfile?.address,
   businessPhone: businessProfile?.phone,

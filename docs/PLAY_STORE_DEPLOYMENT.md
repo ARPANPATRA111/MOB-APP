@@ -1,8 +1,8 @@
-# MOB — Play Store Deployment: Single Source of Truth
+# MOPX — Play Store Deployment: Single Source of Truth
 
 **Prepared:** 7 August 2026
-**App:** MOB — Retail POS & Inventory
-**Package:** `com.arpanpatra.mobapp`
+**App:** MOPX — Retail POS & Inventory
+**Package:** `com.arpanpatra.mopx`
 **Target:** Closed testing → Production
 
 > **How to use this document.** Everything in a *Answer* block is verified against
@@ -88,7 +88,7 @@ internals and break the toolchain to fix issues that cannot affect your users.
 
 | Field | Value |
 | --- | --- |
-| Application ID | `com.arpanpatra.mobapp` |
+| Application ID | `com.arpanpatra.mopx` |
 | Version name | `2.0.0` |
 | Version code | Managed remotely by EAS (`appVersionSource: remote`, auto-increment) |
 | Min SDK | 24 (Android 7.0 Nougat) |
@@ -125,7 +125,7 @@ access.
 
 > **Answer:** *All functionality is available without special access.*
 
-MOB has no login, no account, no paywall, and no region lock. Do not provide
+MOPX has no login, no account, no paywall, and no region lock. Do not provide
 test credentials — there are none.
 
 ### 3.2 Ads
@@ -163,7 +163,7 @@ Category: **Utility, Productivity, Communication, or Other**
 | Ads shown to children | N/A — no ads |
 
 > Selecting 18+ keeps the app out of the Families programme, which is correct —
-> MOB is a business tool, not a consumer or children's app.
+> MOPX is a business tool, not a consumer or children's app.
 
 ### 3.5 Other declarations
 
@@ -176,7 +176,7 @@ Category: **Utility, Productivity, Communication, or Other**
 | Health apps | **No** | |
 | Data safety | See §5 | |
 
-> ⚠️ **Financial features — important.** MOB records a *payment method label*
+> ⚠️ **Financial features — important.** MOPX records a *payment method label*
 > ("Cash", "UPI", "Card") on a bill. It does **not** process payments, connect to
 > any payment gateway, hold funds, offer credit, or handle bank data. There is no
 > Play Billing integration and no in-app purchase. Answer **"My app doesn't
@@ -195,9 +195,9 @@ Do not add the `AD_ID` permission. Nothing in the app reads it.
 
 ### App name (30 char max)
 ```
-MOB — Shop Billing & Stock
+MOPX — Shop Billing & Stock
 ```
-*(25 characters)*
+*(27 characters)*
 
 ### Short description (80 char max)
 ```
@@ -208,7 +208,7 @@ Offline billing, barcode scanning and stock management for your shop.
 ### Full description (4000 char max)
 
 ```
-MOB is a fast, offline point-of-sale and inventory app built for small shops —
+MOPX is a fast, offline point-of-sale and inventory app built for small shops —
 kirana stores, stationery shops, hardware stores, boutiques and local
 wholesalers.
 
@@ -248,7 +248,7 @@ BUILT FOR REAL SHOPS
 NO ADS. NO TRACKING. NO SUBSCRIPTION.
 
 IMPORTANT — BACK UP YOUR DATA
-Because MOB stores everything on your device and never uploads it, there is no
+Because MOPX stores everything on your device and never uploads it, there is no
 automatic cloud backup. If you lose or change your phone, your data goes with
 it. Please use Settings → Backup your data regularly and keep the file safe.
 
@@ -316,7 +316,7 @@ Do **not** tick any of these — none apply:
 - Web browsing history
 - App info and performance (crash logs, diagnostics, other)
 
-> **The subtle one:** MOB *stores* customer names, phone numbers, photos and
+> **The subtle one:** MOPX *stores* customer names, phone numbers, photos and
 > purchase history — but Google's Data Safety form covers data that is
 > **collected (sent off the device) or shared**. Data that never leaves the
 > device is explicitly out of scope. Since none of it is transmitted, none of it
@@ -402,7 +402,7 @@ production. Check Play Console → Settings → Developer account → Account de
 1. **Confirm developer account type** — Play Console → Settings → Developer
    account. Personal vs organisation decides whether §6 applies.
 2. **Host the privacy policy.** See §10.3. You need a live public URL.
-3. **Create the app** in Play Console: *Create app* → name `MOB`, language
+3. **Create the app** in Play Console: *Create app* → name `MOPX`, language
    English (India or US), **App**, **Free**, accept declarations.
 
 ### Phase B — Build the AAB
@@ -523,7 +523,7 @@ that is your market; you can expand later.
 ## 11. Release notes for the first closed-testing release
 
 ```
-First closed test of MOB 2.0.
+First closed test of MOPX 2.0.
 
 • Redesigned home screen with a 7-day sales chart and today-vs-yesterday comparison
 • New bottom navigation — Home, Stock, New Bill, Reports, Settings

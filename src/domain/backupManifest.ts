@@ -1,5 +1,5 @@
 /**
- * Integrity metadata + validation for full MOB backups (`.mobbackup` / JSON).
+ * Integrity metadata + validation for full MOPX backups (JSON).
  *
  * A backup carries a manifest (format tag, app + schema version, timestamp,
  * row counts, checksum) so a restore can be validated and previewed before it
@@ -13,8 +13,17 @@ export interface BackupCounts {
   categories: number;
 }
 
+/** Current format tag. */
+export const BACKUP_FORMAT = 'mopx-backup';
+
+/**
+ * Tags accepted on restore. The app shipped as "MOB" before the rename, so
+ * backups taken then carry the old tag and must keep restoring.
+ */
+export const ACCEPTED_BACKUP_FORMATS = ['mopx-backup', 'mob-backup'] as const;
+
 export interface BackupManifest {
-  format: 'mob-backup';
+  format: (typeof ACCEPTED_BACKUP_FORMATS)[number];
   appVersion: string;
   schemaVersion: number;
   latestMigrationId: string;
@@ -70,14 +79,14 @@ export const validateBackup = (parsed: unknown): BackupValidation => {
   const warnings: string[] = [];
 
   if (!parsed || typeof parsed !== 'object') {
-    return { valid: false, errors: ['This file is not a valid MOB backup.'], warnings };
+    return { valid: false, errors: ['This file is not a valid MOPX backup.'], warnings };
   }
 
   const record = parsed as Record<string, unknown>;
   const manifest = record.manifest as Partial<BackupManifest> | undefined;
 
-  if (!manifest || manifest.format !== 'mob-backup') {
-    errors.push('Missing MOB backup manifest — this may be an old or unrelated file.');
+  if (!manifest || !ACCEPTED_BACKUP_FORMATS.includes(manifest.format as never)) {
+    errors.push('Missing MOPX backup manifest — this may be an old or unrelated file.');
   }
 
   const inventory = Array.isArray(record.inventory) ? (record.inventory as unknown[]) : null;
@@ -119,7 +128,7 @@ export const buildManifest = (params: {
   latestMigrationId: string;
   data: ChecksumPayload;
 }): BackupManifest => ({
-  format: 'mob-backup',
+  format: BACKUP_FORMAT,
   appVersion: params.appVersion,
   schemaVersion: params.schemaVersion,
   latestMigrationId: params.latestMigrationId,

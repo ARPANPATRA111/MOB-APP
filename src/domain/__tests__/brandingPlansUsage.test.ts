@@ -2,11 +2,11 @@ import { APP_FULL_NAME, APP_MEANING, APP_NAME } from '../branding';
 import { getPlan, hasFeatureAccess } from '../plans';
 import { calculateLimitStatus, getUsageStatuses, shouldShowSoftUpgradePrompt } from '../usageLimits';
 
-describe('MOB branding and plan rules', () => {
-  it('uses MOB as the customer-facing app name', () => {
-    expect(APP_NAME).toBe('MOB');
-    expect(APP_FULL_NAME).toContain('MOB');
-    expect(APP_MEANING).toBe('Mobile Operated Business');
+describe('MOPX branding and plan rules', () => {
+  it('uses MOPX as the customer-facing app name', () => {
+    expect(APP_NAME).toBe('MOPX');
+    expect(APP_FULL_NAME).toContain('MOPX');
+    expect(APP_MEANING).toBe('Mobile Operated POS, extended');
   });
 
   it('keeps free limits practical and paid plan features gated', () => {

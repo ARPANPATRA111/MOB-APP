@@ -4,7 +4,7 @@ import { Theme } from '../../contexts/ThemeContext';
 import { APP_NAME, APP_TAGLINE } from '../../domain/branding';
 import { useReducedMotion } from './Skeleton';
 
-// New MOB logo (added at repo root alongside the launcher assets).
+// New MOPX logo (added at repo root alongside the launcher assets).
 const logo = require('../../../App_logo.png');
 
 /**

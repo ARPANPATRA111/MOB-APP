@@ -2,7 +2,7 @@
 
 ## Project Purpose
 
-MOB is an offline-first React Native/Expo retail POS and inventory app for small vendors and shopkeepers. The revamp goal is a reliable local retail management foundation before advanced features.
+MOPX is an offline-first React Native/Expo retail POS and inventory app for small vendors and shopkeepers. The revamp goal is a reliable local retail management foundation before advanced features.
 
 ## Run The App
 
