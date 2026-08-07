@@ -1,944 +1,536 @@
-// BillingScreen.tsx
-
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  SafeAreaView,
-  Alert,
-  TextInput,
-  Modal,
-  Image,
-  ActivityIndicator,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform
-} from 'react-native';
-import { CameraView, BarcodeScanningResult, Camera } from 'expo-camera';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { StackNavigationProp } from '@react-navigation/stack';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FlatList, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Camera, CameraView, BarcodeScanningResult } from 'expo-camera';
 import { Audio } from 'expo-av';
-import { FontAwesome5, Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { useTheme } from '../src/contexts/ThemeContext';
+import { FontAwesome5, Ionicons } from '@expo/vector-icons';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { useIsFocused } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../App';
+import { useTheme, type Theme } from '../src/contexts/ThemeContext';
+import { useCurrency } from '../src/contexts/CurrencyContext';
+import { useDialog } from '../src/components/ui/DialogProvider';
+import { removeCartItem, updateCartQuantity, type CartItem } from '../src/domain/cart';
+import {
+  addScannedProductToCart,
+  buildProductNotFoundMessage,
+  validateCartForCheckout,
+} from '../src/domain/scannerCart';
+import { storageService } from '../src/services/storage';
+import { billingSession } from '../src/services/billingSession';
+import { canonicalBarcode } from '../src/domain/barcode';
+import type { InventoryItem } from '../src/types';
+import { useDebouncedValue } from '../src/hooks/useDebouncedValue';
+import AppBadge from '../src/components/ui/AppBadge';
+import AppButton from '../src/components/ui/AppButton';
+import AppCard from '../src/components/ui/AppCard';
+import AppEmptyState from '../src/components/ui/AppEmptyState';
+import AppLoadingState from '../src/components/ui/AppLoadingState';
+import AppScreen from '../src/components/ui/AppScreen';
+import BottomActionBar from '../src/components/ui/BottomActionBar';
+import SearchBar from '../src/components/ui/SearchBar';
+import SectionHeader from '../src/components/ui/SectionHeader';
 import BarcodeInputModal from '../src/components/BarcodeInputModal';
-import PaymentMethodSelector from '../src/components/PaymentMethodSelector';
+import { typography } from '../src/theme/typography';
 
-interface BillItem {
-  id: string;
-  name: string;
-  quantity: number;
-  price: number;
-  total: number;
-  image?: string;
-}
-
-interface Bill {
-  id: string;
-  items: BillItem[];
-  total: number;
-  customerName: string;
-  timestamp: number;
-  paymentMethod: string;
-}
+const SCAN_REPEAT_GUARD_MS = 700;
 
 const BillingScreen: React.FC<{ navigation: StackNavigationProp<RootStackParamList, 'Billing'> }> = ({ navigation }) => {
   const { theme } = useTheme();
+  const currency = useCurrency();
+  const dialog = useDialog();
+  const isFocused = useIsFocused();
+  const insets = useSafeAreaInsets();
   const styles = createStyles(theme);
-
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
-  const [billItems, setBillItems] = useState<BillItem[]>([]);
-  const [inventory, setInventory] = useState<any[]>([]);
-  const [scanning, setScanning] = useState(false);
-  const [customerName, setCustomerName] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('Cash');
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [showItemsModal, setShowItemsModal] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [showManualInput, setShowManualInput] = useState(false);
   const soundRef = useRef<Audio.Sound | null>(null);
+  const lastScanRef = useRef<{ barcode: string; at: number } | null>(null);
+  const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [products, setProducts] = useState<InventoryItem[]>([]);
+  const [cart, setCart] = useState<CartItem[]>(() => billingSession.getCart());
+  const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearch = useDebouncedValue(searchQuery, 220);
+  const [loading, setLoading] = useState(true);
+  const [searching, setSearching] = useState(false);
+  const [showManualInput, setShowManualInput] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
+  const [pickerQuery, setPickerQuery] = useState('');
+  const debouncedPicker = useDebouncedValue(pickerQuery, 220);
+  const [pickerProducts, setPickerProducts] = useState<InventoryItem[]>([]);
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [toast, setToast] = useState<{ tone: 'success' | 'warning' | 'danger'; text: string } | null>(null);
+
+  const scannerActive = hasPermission === true && isFocused && !showManualInput && !showPicker;
+
+  const cartTotal = useMemo(() => cart.reduce((sum, item) => sum + item.total, 0), [cart]);
+
+  const showToast = useCallback((tone: 'success' | 'warning' | 'danger', text: string) => {
+    setToast({ tone, text });
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+    }
+    toastTimeoutRef.current = setTimeout(() => setToast(null), 2000);
+  }, []);
+
+  const loadProducts = useCallback(
+    async (query = '') => {
+      setSearching(true);
+      try {
+        const items = await storageService.searchInventory(query, 40);
+        setProducts(items.filter((item) => item.quantity > 0));
+      } catch (error) {
+        console.error('Product search failed:', error);
+        showToast('danger', 'Product search failed. Try again.');
+      } finally {
+        setSearching(false);
+        setLoading(false);
+      }
+    },
+    [showToast]
+  );
 
   useEffect(() => {
     const setup = async () => {
       try {
         const { status } = await Camera.requestCameraPermissionsAsync();
         setHasPermission(status === 'granted');
-        await loadInventory();
-        await loadSound();
+        const { sound } = await Audio.Sound.createAsync(require('../assets/BEEP_SOUND.mp3'));
+        soundRef.current = sound;
+        await loadProducts();
       } catch (error) {
-        console.error('Error initializing:', error);
-        setHasPermission(false);
+        console.error('Billing setup failed:', error);
+        void dialog.alert({ title: 'Billing unavailable', message: 'Unable to initialize billing right now.' });
+        setLoading(false);
       }
     };
-
-    setup();
-
+    void setup();
     return () => {
-      if (soundRef.current) {
-        soundRef.current.unloadAsync();
+      void soundRef.current?.unloadAsync();
+      if (toastTimeoutRef.current) {
+        clearTimeout(toastTimeoutRef.current);
       }
     };
-  }, []);
+  }, [loadProducts, dialog]);
 
-  const loadInventory = async () => {
-    try {
-      const inventoryJSON = await AsyncStorage.getItem('inventory');
-      if (inventoryJSON) {
-        setInventory(JSON.parse(inventoryJSON));
+  useEffect(() => {
+    void loadProducts(debouncedSearch);
+  }, [debouncedSearch, loadProducts]);
+
+  useEffect(() => {
+    billingSession.setCart(cart);
+  }, [cart]);
+
+  // Load products for the browse-inventory picker.
+  useEffect(() => {
+    if (!showPicker) return;
+    let active = true;
+    void (async () => {
+      try {
+        const items = await storageService.searchInventory(debouncedPicker, 60);
+        if (active) {
+          setPickerProducts(items.filter((item) => item.quantity > 0));
+        }
+      } catch (error) {
+        console.error('Picker search failed:', error);
       }
-    } catch (error) {
-      console.error('Error loading inventory:', error);
-      Alert.alert('Error', 'Failed to load inventory');
-    }
-  };
-
-  const loadSound = async () => {
-    try {
-      const { sound } = await Audio.Sound.createAsync(
-        require('../assets/BEEP_SOUND.mp3')
-      );
-      soundRef.current = sound;
-    } catch (error) {
-      console.error('Failed to load sound', error);
-    }
-  };
+    })();
+    return () => {
+      active = false;
+    };
+  }, [showPicker, debouncedPicker]);
 
   const playSound = async () => {
-    if (soundRef.current) {
-      try {
-        await soundRef.current.replayAsync();
-      } catch (error) {
-        console.error('Failed to play sound', error);
-      }
+    try {
+      await soundRef.current?.replayAsync();
+    } catch (error) {
+      console.error('Beep failed:', error);
     }
   };
 
-  const handleBarCodeScanned = async (result: BarcodeScanningResult) => {
-    const { data } = result;
-    await playSound();
-    
-    const item = inventory.find(i => i.barcode === data);
-    if (item) {
-      if (item.quantity <= 0) {
-        Alert.alert('Out of Stock', `${item.name} is out of stock`);
+  const addProduct = useCallback(
+    (product: InventoryItem, source: 'scan' | 'tap' | 'manual' = 'tap') => {
+      try {
+        setCart((items) => {
+          const result = addScannedProductToCart(items, {
+            barcode: product.barcode,
+            name: product.name,
+            price: product.price,
+            quantity: product.quantity,
+            imageUri: product.imageUri,
+          });
+          showToast(result.tone, source === 'tap' ? result.feedback.replace('Added:', 'Added from search:') : result.feedback);
+          return result.cart;
+        });
+      } catch (error) {
+        showToast('danger', (error as Error).message);
+      }
+    },
+    [showToast]
+  );
+
+  const addBarcode = useCallback(
+    async (barcode: string, source: 'scan' | 'manual') => {
+      try {
+        const normalized = barcode.trim();
+        // Try the scanned value, then its canonical (UPC-A ↔ EAN-13) forms so a
+        // product stored under either representation still matches.
+        let product = await storageService.getInventoryItemByBarcode(normalized);
+        if (!product) {
+          const canon = canonicalBarcode(normalized);
+          if (canon && canon !== normalized) {
+            product = await storageService.getInventoryItemByBarcode(canon);
+          }
+        }
+        if (!product && normalized.length === 13 && normalized.startsWith('0')) {
+          product = await storageService.getInventoryItemByBarcode(normalized.slice(1));
+        }
+        if (!product) {
+          showToast('warning', buildProductNotFoundMessage(normalized));
+          return;
+        }
+        addProduct(product, source);
+      } catch (error) {
+        console.error('Barcode lookup failed:', error);
+        showToast('danger', 'Could not look up that barcode. Try again.');
+      }
+    },
+    [addProduct, showToast]
+  );
+
+  const scanBarcode = async (result: BarcodeScanningResult) => {
+    try {
+      const now = Date.now();
+      if (lastScanRef.current?.barcode === result.data && now - lastScanRef.current.at < SCAN_REPEAT_GUARD_MS) {
         return;
       }
-      addItemToBill(item);
-    } else {
-      Alert.alert('Not Found', 'Item not found in inventory');
+      lastScanRef.current = { barcode: result.data, at: now };
+      await playSound();
+      await addBarcode(result.data, 'scan');
+    } catch (error) {
+      console.error('Scan handling failed:', error);
+      showToast('danger', 'Scan failed. Try again.');
     }
-    setScanning(false);
   };
 
-  const addItemToBill = (item: any) => {
-    setBillItems(prevItems => {
-      const existingItem = prevItems.find(i => i.id === item.barcode);
-      const inventoryItem = inventory.find(i => i.barcode === item.barcode);
-      
-      if (existingItem) {
-        // Check if adding one more would exceed stock
-        if (existingItem.quantity + 1 > (inventoryItem?.quantity || 0)) {
-          Alert.alert('Out of Stock', `Only ${inventoryItem?.quantity} units available`);
-          return prevItems;
-        }
-        return prevItems.map(i => 
-          i.id === item.barcode 
-            ? { ...i, quantity: i.quantity + 1, total: (i.quantity + 1) * i.price }
-            : i
-        );
-      } else {
-        // For new item, check if at least 1 is available
-        if (item.quantity <= 0) {
-          Alert.alert('Out of Stock', 'This item is out of stock');
-          return prevItems;
-        }
-        return [
-          ...prevItems,
-          {
-            id: item.barcode,
-            name: item.name,
-            quantity: 1,
-            price: item.price,
-            total: item.price,
-            image: item.imageUri
-          }
-        ];
-      }
-    });
+  const changeQuantity = (item: CartItem, quantity: number) => {
+    try {
+      setCart((items) => updateCartQuantity(items, item.id, quantity, item.availableStock));
+    } catch (error) {
+      showToast('warning', (error as Error).message);
+    }
   };
 
-  const removeItem = (id: string) => {
-    setBillItems(prevItems => prevItems.filter(item => item.id !== id));
-  };
-
-const updateQuantity = (id: string, newQuantity: number) => {
-  if (newQuantity <= 0) {
-    removeItem(id);
-    return;
-  }
-
-  const inventoryItem = inventory.find(i => i.barcode === id);
-  if (inventoryItem && newQuantity > inventoryItem.quantity) {
-    Alert.alert('Out of Stock', `Only ${inventoryItem.quantity} units available`);
-    return;
-  }
-
-  setBillItems(prevItems =>
-    prevItems.map(item =>
-      item.id === id
-        ? { ...item, quantity: newQuantity, total: newQuantity * item.price }
-        : item
-    )
-  );
-};
-
-  const calculateTotal = () => {
-    return billItems.reduce((sum, item) => sum + item.total, 0);
-  };
-
-  const processPayment = async () => {
-    if (billItems.length === 0) {
-      Alert.alert('Error', 'No items in the bill');
+  const setQuantityDirect = (item: CartItem, text: string) => {
+    const parsed = parseInt(text.replace(/[^0-9]/g, ''), 10);
+    if (isNaN(parsed) || parsed <= 0) {
       return;
     }
-
-    setLoading(true);
-    try {
-      const billId = `BILL-${Date.now()}`;
-      const bill: Bill = {
-        id: billId,
-        items: billItems,
-        total: calculateTotal(),
-        customerName,
-        timestamp: Date.now(),
-        paymentMethod
-      };
-
-      const updatedInventory = inventory.map(item => {
-        const billItem = billItems.find(bi => bi.id === item.barcode);
-        if (billItem) {
-          return { ...item, quantity: item.quantity - billItem.quantity };
-        }
-        return item;
-      });
-
-      await AsyncStorage.setItem('inventory', JSON.stringify(updatedInventory));
-      
-      const billsJSON = await AsyncStorage.getItem('bills');
-      const bills = billsJSON ? JSON.parse(billsJSON) : [];
-      await AsyncStorage.setItem('bills', JSON.stringify([...bills, bill]));
-
-      setBillItems([]);
-      setCustomerName('');
-      setPaymentMethod('Cash');
-      setShowPaymentModal(false);
-      
-      navigation.navigate('BillReceipt', { billId });
-    } catch (error) {
-      console.error('Error processing payment:', error);
-      Alert.alert('Error', 'Failed to process payment');
-    } finally {
-      setLoading(false);
+    const clamped = Math.min(parsed, item.availableStock);
+    changeQuantity(item, clamped);
+    if (parsed > item.availableStock) {
+      showToast('warning', `Only ${item.availableStock} in stock`);
     }
   };
 
-  const renderBillItem = ({ item }: { item: BillItem }) => {
-    const inventoryItem = inventory.find(i => i.barcode === item.id);
-    const availableStock = inventoryItem?.quantity || 0;
-    const isMaxQuantity = item.quantity >= availableStock;
-  
-    return (
-      <View style={styles.billItem}>
-        <View style={styles.itemImageContainer}>
-          {item.image ? (
-            <Image source={{ uri: item.image }} style={styles.itemImage} />
-          ) : (
-            <View style={styles.itemImagePlaceholder}>
-              <FontAwesome5 name="box" size={20} color={theme.textSecondary} />
-            </View>
-          )}
-        </View>
-        
-        <View style={styles.itemDetails}>
-          <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
-          <Text style={styles.itemPrice}>${item.price.toFixed(2)}</Text>
-          <Text style={styles.stockText}>
-            {availableStock > 0 ? `${availableStock} in stock` : 'Out of stock'}
-          </Text>
-        </View>
-        
-        <View style={styles.quantityControls}>
-          <TouchableOpacity
-            style={styles.quantityButton}
-            onPress={() => updateQuantity(item.id, item.quantity - 1)}
-          >
-            <Text style={styles.quantityButtonText}>-</Text>
-          </TouchableOpacity>
-          
-          <View style={styles.quantityDisplay}>
-            <Text style={styles.quantityText}>{item.quantity}</Text>
-          </View>
-          
-          <TouchableOpacity
-            style={[
-              styles.quantityButton,
-              isMaxQuantity && styles.disabledButton
-            ]}
-            onPress={() => {
-              if (!isMaxQuantity) {
-                updateQuantity(item.id, item.quantity + 1);
-              }
-            }}
-            disabled={isMaxQuantity}
-          >
-            <Text style={[
-              styles.quantityButtonText,
-              isMaxQuantity && styles.disabledButtonText
-            ]}>+</Text>
-          </TouchableOpacity>
-        </View>
-        
-        <Text style={styles.itemTotal}>${item.total.toFixed(2)}</Text>
-        
-        <TouchableOpacity
-          style={styles.deleteButton}
-          onPress={() => removeItem(item.id)}
-        >
-          <MaterialIcons name="delete" size={24} color="#dc3545" />
-        </TouchableOpacity>
-      </View>
-    );
+  const reviewBill = () => {
+    try {
+      validateCartForCheckout(cart);
+      billingSession.setCart(cart);
+      navigation.navigate('BillReview');
+    } catch (error) {
+      showToast('warning', (error as Error).message);
+    }
   };
-  const filteredInventory = useMemo(() => {
-    return inventory.filter(item =>
-      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.barcode.includes(searchQuery)
-    );
-  }, [inventory, searchQuery]);
 
-  if (hasPermission === null) {
-    return (
-      <View style={styles.permissionContainer}>
-        <ActivityIndicator size="large" color={theme.primary} />
-        <Text style={styles.permissionText}>Requesting camera permission...</Text>
-      </View>
-    );
-  }
-
-  if (hasPermission === false) {
-    return (
-      <View style={styles.permissionContainer}>
-        <Text style={styles.permissionText}>Camera access denied</Text>
-        <Text style={styles.permissionSubtext}>You can still add items manually</Text>
-        
-        <TouchableOpacity
-          style={styles.button}
-          onPress={() => setShowItemsModal(true)}
-        >
-          <Text style={styles.buttonText}>Browse Items</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={[styles.button, styles.manualButton]}
-          onPress={() => setShowManualInput(true)}
-        >
-          <Text style={styles.buttonText}>Enter Barcode</Text>
-        </TouchableOpacity>
-      </View>
-    );
+  if (loading) {
+    return <AppLoadingState theme={theme} label="Opening scanner..." />;
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      {scanning ? (
-        <View style={styles.cameraContainer}>
-          <CameraView
-            style={styles.camera}
-            facing="back"
-            barcodeScannerSettings={{
-              barcodeTypes: ["ean13", "upc_a", "code128"]
-            }}
-            onBarcodeScanned={handleBarCodeScanned}
-          />
-          <View style={styles.cameraButtonsContainer}>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setScanning(false)}
-            >
-              <Ionicons name="close" size={30} color="white" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.manualInputButton}
-              onPress={() => {
-                setScanning(false);
-                setShowManualInput(true);
-              }}
-            >
-              <Text style={styles.manualInputButtonText}>Manual Input</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      ) : (
-        <>
-          <View style={styles.header}>
-            <Text style={styles.headerText}>Current Bill</Text>
-            <Text style={styles.itemCount}>{billItems.length} items</Text>
-          </View>
-
-          <FlatList
-            data={billItems}
-            renderItem={renderBillItem}
-            keyExtractor={item => item.id}
-            contentContainerStyle={styles.billList}
-            ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                <FontAwesome5 name="receipt" size={48} color={theme.textSecondary} />
-                <Text style={styles.emptyText}>No items added</Text>
-                <Text style={styles.emptySubtext}>Scan items to start billing</Text>
-              </View>
-            }
-          />
-
-          <View style={styles.footer}>
-            <View style={styles.totalContainer}>
-              <Text style={styles.totalLabel}>Total:</Text>
-              <Text style={styles.totalAmount}>${calculateTotal().toFixed(2)}</Text>
+    <AppScreen
+      theme={theme}
+      scroll={false}
+      footer={(
+        <BottomActionBar theme={theme}>
+          <View style={styles.footerRow}>
+            <View>
+              <Text style={styles.footerLabel}>{cart.length} items</Text>
+              <Text style={styles.footerTotal}>{currency.format(cartTotal)}</Text>
             </View>
-
-            <View style={styles.buttonRow}>
-              <TouchableOpacity
-                style={[styles.actionButton, styles.secondaryButton]}
-                onPress={() => setShowItemsModal(true)}
-              >
-                <FontAwesome5 name="list" size={20} color={theme.primary} />
-                <Text style={[styles.buttonText, { color: theme.primary }]}>Items</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.actionButton, styles.scanButton]}
-                onPress={() => setScanning(true)}
-              >
-                <FontAwesome5 name="barcode" size={20} color="white" />
-                <Text style={styles.buttonText}>Scan</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.actionButton, styles.primaryButton]}
-                onPress={() => setShowPaymentModal(true)}
-                disabled={billItems.length === 0}
-              >
-                <FontAwesome5 name="money-bill-wave" size={20} color="white" />
-                <Text style={styles.buttonText}>Pay</Text>
-              </TouchableOpacity>
-            </View>
+            <AppButton label="Review Bill" theme={theme} onPress={reviewBill} disabled={cart.length === 0} style={styles.reviewButton} />
           </View>
-        </>
+        </BottomActionBar>
       )}
-
-      {/* Payment Modal */}
-      <Modal
-        visible={showPaymentModal}
-        transparent={true}
-        animationType="slide"
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={styles.modalContainer}
-        >
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Complete Payment</Text>
-              <TouchableOpacity onPress={() => setShowPaymentModal(false)}>
-                <Ionicons name="close" size={24} color={theme.text} />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.modalLabel}>Customer Name (Optional)</Text>
-            <TextInput
-              style={styles.modalInput}
-              value={customerName}
-              onChangeText={setCustomerName}
-              placeholder="Enter customer name"
-              placeholderTextColor={theme.placeholder}
+    >
+      <View style={styles.root}>
+        <View style={styles.scannerArea}>
+          {hasPermission ? (
+            <CameraView
+              style={styles.camera}
+              facing="back"
+              active={scannerActive}
+              barcodeScannerSettings={{ barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e'] }}
+              onBarcodeScanned={scannerActive ? scanBarcode : undefined}
             />
-
-            <Text style={styles.modalLabel}>Payment Method</Text>
-            <PaymentMethodSelector
-              selectedMethod={paymentMethod}
-              onSelectMethod={setPaymentMethod}
-              theme={theme}
-            />
-
-            <View style={styles.summaryContainer}>
-              <Text style={styles.summaryLabel}>Items: {billItems.length}</Text>
-              <Text style={styles.summaryLabel}>Total:</Text>
-              <Text style={styles.summaryTotal}>${calculateTotal().toFixed(2)}</Text>
+          ) : (
+            <View style={styles.permissionBox}>
+              <Ionicons name="camera-outline" size={24} color={theme.textSecondary} />
+              <Text style={styles.permissionText}>Camera unavailable. Use manual barcode or browse.</Text>
             </View>
-
-            <TouchableOpacity
-              style={[styles.modalButton, { backgroundColor: theme.primary }]}
-              onPress={processPayment}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color="white" />
-              ) : (
-                <Text style={styles.modalButtonText}>
-                  Confirm Payment ({paymentMethod})
-                </Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
-
-      {/* Items Modal */}
-      <Modal
-        visible={showItemsModal}
-        transparent={true}
-        animationType="slide"
-      >
-        <View style={styles.itemsModalContainer}>
-          <View style={styles.itemsModalContent}>
-            <View style={styles.itemsModalHeader}>
-              <Text style={styles.itemsModalTitle}>Available Items</Text>
-              <TouchableOpacity onPress={() => setShowItemsModal(false)}>
-                <Ionicons name="close" size={24} color={theme.text} />
-              </TouchableOpacity>
+          )}
+          {toast ? (
+            <View style={[styles.toast, toastToneStyle(theme, toast.tone)]}>
+              <Text style={[styles.toastText, { color: toastToneText(theme, toast.tone) }]}>{toast.text}</Text>
             </View>
+          ) : null}
+        </View>
 
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search items..."
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholderTextColor={theme.placeholder}
-            />
+        <View style={styles.actionsRow}>
+          <TouchableOpacity style={styles.actionChip} onPress={() => setShowPicker(true)}>
+            <Ionicons name="list" size={16} color={theme.primary} />
+            <Text style={styles.actionChipText}>Browse products</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionChip} onPress={() => setShowManualInput(true)}>
+            <FontAwesome5 name="keyboard" size={14} color={theme.primary} />
+            <Text style={styles.actionChipText}>Manual barcode</Text>
+          </TouchableOpacity>
+        </View>
 
+        <SearchBar theme={theme} placeholder="Quick search product or barcode" value={searchQuery} onChangeText={setSearchQuery} />
+
+        {debouncedSearch ? (
+          <AppCard theme={theme} style={styles.searchPanel}>
+            <SectionHeader theme={theme} title="Search results" subtitle={searching ? 'Searching...' : `${products.length} found`} />
             <FlatList
-              data={filteredInventory}
-              keyExtractor={item => item.barcode}
+              data={products}
+              keyExtractor={(item) => item.barcode}
+              keyboardShouldPersistTaps="handled"
+              horizontal
+              showsHorizontalScrollIndicator={false}
               renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.inventoryItem}
-                  onPress={() => {
-                    addItemToBill(item);
-                    setShowItemsModal(false);
-                  }}
-                >
-                  {item.imageUri ? (
-                    <Image source={{ uri: item.imageUri }} style={styles.inventoryImage} />
-                  ) : (
-                    <View style={styles.inventoryImagePlaceholder}>
-                      <FontAwesome5 name="box" size={20} color={theme.textSecondary} />
-                    </View>
-                  )}
-                  <View style={styles.inventoryDetails}>
-                    <Text style={styles.inventoryName}>{item.name}</Text>
-                    <Text style={styles.inventoryPrice}>${item.price.toFixed(2)}</Text>
-                    <Text style={styles.inventoryStock}>Stock: {item.quantity}</Text>
-                  </View>
+                <TouchableOpacity style={styles.searchResult} onPress={() => addProduct(item, 'tap')}>
+                  <Text style={styles.searchName} numberOfLines={1}>{item.name}</Text>
+                  <Text style={styles.searchMeta}>Stock {item.quantity}</Text>
+                  <Text style={styles.searchPrice}>{currency.format(item.price)}</Text>
                 </TouchableOpacity>
               )}
-              contentContainerStyle={styles.inventoryList}
             />
+          </AppCard>
+        ) : null}
+
+        <AppCard theme={theme} style={styles.cartPanel}>
+          <SectionHeader theme={theme} title="Live cart" subtitle="Scanned products appear here" right={<AppBadge theme={theme} label={`${cart.length}`} />} />
+          {cart.length === 0 ? (
+            <AppEmptyState theme={theme} title="No products scanned" message="Scan, search, browse, or enter a barcode to start." />
+          ) : (
+            <FlatList
+              data={cart}
+              keyExtractor={(item) => item.id}
+              initialNumToRender={10}
+              maxToRenderPerBatch={12}
+              windowSize={7}
+              keyboardShouldPersistTaps="handled"
+              renderItem={({ item }) => (
+                <View style={styles.cartRow}>
+                  <View style={styles.cartInfo}>
+                    <Text style={styles.cartName} numberOfLines={1}>{item.name}</Text>
+                    <Text style={styles.cartMeta}>{currency.format(item.price)} · line {currency.format(item.total)}</Text>
+                  </View>
+                  <View style={styles.qtyControls}>
+                    <TouchableOpacity style={styles.qtyButton} onPress={() => changeQuantity(item, item.quantity - 1)}>
+                      <Ionicons name="remove" size={18} color={theme.text} />
+                    </TouchableOpacity>
+                    <TextInput
+                      style={styles.qtyInput}
+                      value={String(item.quantity)}
+                      keyboardType="number-pad"
+                      selectTextOnFocus
+                      onChangeText={(text) => setQuantityDirect(item, text)}
+                      accessibilityLabel={`Quantity for ${item.name}`}
+                    />
+                    <TouchableOpacity style={styles.qtyButton} onPress={() => changeQuantity(item, item.quantity + 1)}>
+                      <Ionicons name="add" size={18} color={theme.text} />
+                    </TouchableOpacity>
+                  </View>
+                  <TouchableOpacity style={styles.removeButton} onPress={() => setCart((items) => removeCartItem(items, item.id))}>
+                    <Ionicons name="close" size={20} color={theme.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+              )}
+            />
+          )}
+        </AppCard>
+      </View>
+
+      {/* Browse inventory picker */}
+      <Modal visible={showPicker} animationType="slide" transparent onRequestClose={() => setShowPicker(false)}>
+        <View style={styles.pickerBackdrop}>
+          <View style={[styles.pickerSheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+            <View style={styles.pickerHeader}>
+              <Text style={styles.pickerTitle}>Browse products</Text>
+              <TouchableOpacity onPress={() => setShowPicker(false)} accessibilityLabel="Close">
+                <Ionicons name="close" size={24} color={theme.text} />
+              </TouchableOpacity>
+            </View>
+            <SearchBar theme={theme} placeholder="Search products" value={pickerQuery} onChangeText={setPickerQuery} />
+            <FlatList
+              data={pickerProducts}
+              keyExtractor={(item) => item.barcode}
+              keyboardShouldPersistTaps="handled"
+              style={styles.pickerList}
+              ListEmptyComponent={<AppEmptyState theme={theme} title="No products" message="Try another search." />}
+              renderItem={({ item }) => (
+                <TouchableOpacity style={styles.pickerRow} onPress={() => addProduct(item, 'tap')}>
+                  <View style={styles.cartInfo}>
+                    <Text style={styles.cartName} numberOfLines={1}>{item.name}</Text>
+                    <Text style={styles.cartMeta}>{item.barcode} · Stock {item.quantity}</Text>
+                  </View>
+                  <Text style={styles.searchPrice}>{currency.format(item.price)}</Text>
+                  <Ionicons name="add-circle" size={24} color={theme.primary} style={{ marginLeft: 10 }} />
+                </TouchableOpacity>
+              )}
+            />
+            <AppButton label="Done" theme={theme} onPress={() => setShowPicker(false)} />
           </View>
         </View>
       </Modal>
 
-      {/* Manual Barcode Input Modal */}
       <BarcodeInputModal
         visible={showManualInput}
         onClose={() => setShowManualInput(false)}
         onSubmit={(barcode) => {
-          const item = inventory.find(i => i.barcode === barcode);
-          if (item) {
-            playSound();
-            addItemToBill(item);
-          } else {
-            Alert.alert('Not Found', 'Item not found in inventory');
-          }
           setShowManualInput(false);
+          void addBarcode(barcode, 'manual');
         }}
         theme={theme}
       />
-    </SafeAreaView>
+    </AppScreen>
   );
 };
 
-const createStyles = (theme: any) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.background,
-  },
-  permissionContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  permissionText: {
-    fontSize: 18,
-    color: theme.text,
-    marginBottom: 10,
-  },
-  permissionSubtext: {
-    fontSize: 14,
-    color: theme.textSecondary,
-    marginBottom: 20,
-  },
-  button: {
-    backgroundColor: theme.primary,
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-    width: '80%',
-  },
-  manualButton: {
-    backgroundColor: theme.secondary,
-    marginTop: 10,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  cameraContainer: {
-    flex: 1,
-    position: 'relative',
-  },
-  camera: {
-    flex: 1,
-  },
-  cameraButtonsContainer: {
-    position: 'absolute',
-    bottom: 30,
-    width: '100%',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-  },
-  closeButton: {
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  manualInputButton: {
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    borderRadius: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  manualInputButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  header: {
-    padding: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.divider,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: theme.text,
-  },
-  itemCount: {
-    fontSize: 16,
-    color: theme.textSecondary,
-  },
-  billList: {
-    padding: 10,
-    flexGrow: 1,
-  },
-  billItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 10,
-    marginBottom: 10,
-    backgroundColor: theme.cardBackground,
-    borderRadius: 8,
-  },
-  itemImageContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 4,
+const toastToneStyle = (theme: Theme, tone: 'success' | 'warning' | 'danger') => {
+  const dark = theme.mode === 'dark';
+  if (tone === 'success') return { backgroundColor: dark ? '#14532d' : '#dcfce7' };
+  if (tone === 'warning') return { backgroundColor: dark ? '#78350f' : '#fef3c7' };
+  return { backgroundColor: dark ? '#7f1d1d' : '#fee2e2' };
+};
+
+const toastToneText = (theme: Theme, tone: 'success' | 'warning' | 'danger') => {
+  const dark = theme.mode === 'dark';
+  if (dark) return '#ffffff';
+  if (tone === 'success') return '#166534';
+  if (tone === 'warning') return '#92400e';
+  return '#991b1b';
+};
+
+const createStyles = (theme: Theme) => StyleSheet.create({
+  // Gutters and footer clearance come from AppScreen, which measures the real
+  // action-bar height instead of guessing at a fixed offset.
+  root: { flex: 1, gap: 10 },
+  scannerArea: {
+    height: 168,
+    borderRadius: 12,
     overflow: 'hidden',
-    marginRight: 10,
-    backgroundColor: theme.inputBackground,
+    backgroundColor: '#111827',
   },
-  itemImage: {
-    width: '100%',
-    height: '100%',
+  camera: { flex: 1 },
+  permissionBox: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8, padding: 12 },
+  permissionText: { color: '#ffffff', ...typography.caption, textAlign: 'center' },
+  toast: {
+    position: 'absolute',
+    left: 12,
+    right: 12,
+    top: 10,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
-  itemImagePlaceholder: {
+  toastText: { ...typography.caption },
+  actionsRow: { flexDirection: 'row', gap: 10 },
+  actionChip: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  itemDetails: {
-    flex: 1,
-  },
-  itemName: {
-    fontSize: 16,
-    color: theme.text,
-    marginBottom: 4,
-  },
-  itemPrice: {
-    fontSize: 14,
-    color: theme.textSecondary,
-  },
-  quantityControls: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: 10,
+    justifyContent: 'center',
+    gap: 8,
+    minHeight: 42,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: theme.divider,
+    backgroundColor: theme.cardBackground,
   },
-  quantityButton: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+  actionChipText: { color: theme.primary, ...typography.caption, fontWeight: '700' },
+  searchPanel: { padding: 10, maxHeight: 132 },
+  searchResult: {
+    width: 154,
+    minHeight: 72,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.divider,
+    padding: 10,
+    marginRight: 8,
     backgroundColor: theme.inputBackground,
-    justifyContent: 'center',
+  },
+  searchName: { color: theme.text, ...typography.bodyStrong },
+  searchMeta: { color: theme.textSecondary, ...typography.caption, marginTop: 4 },
+  searchPrice: { color: theme.primary, ...typography.caption, marginTop: 4 },
+  cartPanel: { flex: 1, padding: 12 },
+  cartRow: {
+    minHeight: 56,
+    flexDirection: 'row',
     alignItems: 'center',
-  },
-  quantityButtonText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: theme.text,
-  },
-  quantityText: {
-    marginHorizontal: 10,
-    fontSize: 16,
-    color: theme.text,
-  },
-  itemTotal: {
-    width: 70,
-    textAlign: 'right',
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: theme.text,
-  },
-  stockText: {
-    fontSize: 12,
-    color: theme.textSecondary,
-    marginTop: 4,
-  },
-  quantityDisplay: {
-    minWidth: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  disabledButton: {
-    backgroundColor: theme.disabled,
-  },
-  disabledButtonText: {
-    color: theme.textSecondary,
-  },
-  deleteButton: {
-    marginLeft: 10,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 40,
-  },
-  emptyText: {
-    fontSize: 18,
-    color: theme.text,
-    marginTop: 15,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: theme.textSecondary,
-    marginTop: 5,
-  },
-  footer: {
-    padding: 15,
+    gap: 8,
     borderTopWidth: 1,
     borderTopColor: theme.divider,
+    paddingVertical: 8,
   },
-  totalContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 15,
-  },
-  totalLabel: {
-    fontSize: 18,
-    color: theme.text,
-  },
-  totalAmount: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: theme.primary,
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  actionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 15,
+  cartInfo: { flex: 1 },
+  cartName: { color: theme.text, ...typography.bodyStrong },
+  cartMeta: { color: theme.textSecondary, ...typography.caption },
+  qtyControls: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  qtyButton: {
+    width: 32,
+    height: 32,
     borderRadius: 8,
-    marginHorizontal: 5,
+    backgroundColor: theme.inputBackground,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  secondaryButton: {
-    backgroundColor: theme.cardBackground,
+  qtyInput: {
+    minWidth: 40,
+    height: 34,
+    textAlign: 'center',
+    color: theme.text,
+    fontWeight: '800',
+    fontSize: 15,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: theme.primary,
+    borderColor: theme.divider,
+    backgroundColor: theme.background,
+    paddingVertical: 0,
   },
-  scanButton: {
-    backgroundColor: '#4a89dc',
-  },
-  primaryButton: {
-    backgroundColor: theme.primary,
-  },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  modalContent: {
-    backgroundColor: theme.cardBackground,
+  removeButton: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  footerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  footerLabel: { color: theme.textSecondary, ...typography.caption },
+  footerTotal: { color: theme.text, ...typography.stat },
+  reviewButton: { minWidth: 150 },
+  // Picker
+  pickerBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  pickerSheet: {
+    backgroundColor: theme.background,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    padding: 20,
-    paddingBottom: 30,
+    padding: 16,
+    maxHeight: '82%',
   },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: theme.text,
-  },
-  modalLabel: {
-    fontSize: 14,
-    color: theme.textSecondary,
-    marginBottom: 8,
-  },
-  modalInput: {
-    backgroundColor: theme.inputBackground,
-    borderRadius: 8,
-    padding: 15,
-    marginBottom: 20,
-    color: theme.text,
-  },
-  summaryContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginVertical: 20,
-  },
-  summaryLabel: {
-    fontSize: 16,
-    color: theme.text,
-  },
-  summaryTotal: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: theme.primary,
-  },
-  modalButton: {
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  modalButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  itemsModalContainer: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  itemsModalContent: {
-    flex: 1,
-    marginTop: 50,
-    backgroundColor: theme.cardBackground,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-  },
-  itemsModalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  itemsModalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: theme.text,
-  },
-  searchInput: {
-    backgroundColor: theme.inputBackground,
-    borderRadius: 8,
-    padding: 15,
-    marginBottom: 15,
-    color: theme.text,
-  },
-  inventoryList: {
-    paddingBottom: 20,
-  },
-  inventoryItem: {
+  pickerHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  pickerTitle: { color: theme.text, ...typography.sectionTitle },
+  pickerList: { marginTop: 10, marginBottom: 12 },
+  pickerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 15,
-    marginBottom: 10,
-    backgroundColor: theme.inputBackground,
-    borderRadius: 8,
-  },
-  inventoryImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 4,
-    marginRight: 15,
-  },
-  inventoryImagePlaceholder: {
-    width: 50,
-    height: 50,
-    borderRadius: 4,
-    backgroundColor: theme.cardBackground,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 15,
-  },
-  inventoryDetails: {
-    flex: 1,
-  },
-  inventoryName: {
-    fontSize: 16,
-    color: theme.text,
-    marginBottom: 5,
-  },
-  inventoryPrice: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: theme.primary,
-  },
-  inventoryStock: {
-    fontSize: 12,
-    color: theme.textSecondary,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.divider,
   },
 });
 
