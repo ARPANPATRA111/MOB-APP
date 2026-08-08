@@ -1,0 +1,84 @@
+{
+  "name": "mopx-app",
+  "version": "2.0.0",
+  "private": true,
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "web": "expo start --web",
+    "doctor": "npx expo-doctor",
+    "typecheck": "tsc --noEmit",
+    "lint": "expo lint src screens App.tsx ErrorBoundary.tsx index.ts",
+    "test": "jest --runInBand",
+    "test:stress": "jest --runInBand --testRegex \".*stress\\.ts$\"",
+    "test:watch": "jest --watch",
+    "verify": "npm run typecheck && npm run lint && npm test && npm run doctor"
+  },
+  "dependencies": {
+    "@expo/vector-icons": "^15.0.2",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-community/datetimepicker": "8.6.0",
+    "@react-navigation/bottom-tabs": "^7.18.14",
+    "@react-navigation/elements": "^2.9.19",
+    "@react-navigation/native": "^7.2.5",
+    "@react-navigation/stack": "^7.9.3",
+    "@types/react": "~19.2.0",
+    "expo": "~55.0.28",
+    "expo-asset": "~55.0.18",
+    "expo-av": "^16.0.8",
+    "expo-camera": "~55.0.21",
+    "expo-constants": "~55.0.17",
+    "expo-file-system": "~55.0.24",
+    "expo-font": "~55.0.8",
+    "expo-image-manipulator": "~55.0.19",
+    "expo-image-picker": "~55.0.22",
+    "expo-linear-gradient": "~55.0.16",
+    "expo-navigation-bar": "~55.0.15",
+    "expo-print": "~55.0.17",
+    "expo-sharing": "~55.0.22",
+    "expo-sqlite": "~55.0.18",
+    "expo-system-ui": "~55.0.20",
+    "expo-updates": "~55.0.26",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "react-native": "0.83.10",
+    "react-native-gesture-handler": "~2.30.0",
+    "react-native-reanimated": "4.2.1",
+    "react-native-safe-area-context": "~5.6.2",
+    "react-native-screens": "~4.23.0",
+    "react-native-web": "~0.21.0",
+    "react-native-worklets": "0.7.4",
+    "typescript": "~5.9.2"
+  },
+  "expo": {
+    "doctor": {
+      "appConfigFieldsNotSyncedCheck": {
+        "enabled": false
+      },
+      "reactNativeDirectoryCheck": {
+        "exclude": [
+          "expo-av",
+          "expo-modules-jsi"
+        ],
+        "listUnknownPackages": false
+      }
+    }
+  },
+  "devDependencies": {
+    "@types/jest": "29.5.14",
+    "babel-preset-expo": "~55.0.8",
+    "eslint": "^9.39.4",
+    "eslint-config-expo": "~55.0.1",
+    "jest": "~29.7.0",
+    "jest-expo": "~55.0.20"
+  },
+  "jest": {
+    "preset": "jest-expo",
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/.expo/"
+    ]
+  }
+}

@@ -1,570 +1,406 @@
-// ReportsScreen.tsx
-
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  SafeAreaView,
-  ActivityIndicator,
-  Alert,
-  Platform,
-  Modal,
-  TouchableWithoutFeedback
-} from 'react-native';
-import { useTheme } from '../src/contexts/ThemeContext';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { RootStackParamList } from '../App';
-import { FontAwesome5, MaterialIcons } from '@expo/vector-icons';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Platform, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { MaterialIcons } from '@expo/vector-icons';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import { useTheme, type Theme } from '../src/contexts/ThemeContext';
+import { useCurrency } from '../src/contexts/CurrencyContext';
+import { storageService } from '../src/services/storage';
+import type { ReportPreset, SalesReportSummary } from '../src/domain/reports';
+import AppBadge from '../src/components/ui/AppBadge';
+import AppButton from '../src/components/ui/AppButton';
+import AppCard from '../src/components/ui/AppCard';
+import AppEmptyState from '../src/components/ui/AppEmptyState';
+import AppScreen from '../src/components/ui/AppScreen';
+import { Skeleton, useDelayedFlag } from '../src/components/ui/Skeleton';
+import { useDialog } from '../src/components/ui/DialogProvider';
+import BottomActionBar from '../src/components/ui/BottomActionBar';
+import InsightBars from '../src/components/ui/InsightBars';
+import SectionHeader from '../src/components/ui/SectionHeader';
+import StatCard from '../src/components/ui/StatCard';
+import { typography } from '../src/theme/typography';
 
-// Define interfaces
-interface ReportItem {
-  id: string;
-  name: string;
-  quantity: number;
-  totalSales: number;
-}
+type RangeMode = ReportPreset | 'custom';
 
-interface SalesReport {
-  period: string;
-  totalSales: number;
-  totalItems: number;
-  items: ReportItem[];
-}
-
-interface Bill {
-  id: string;
-  items: {
-    id: string;
-    name: string;
-    quantity: number;
-    price: number;
-    total: number;
-  }[];
-  total: number;
-  customerName: string;
-  timestamp: number;
-  paymentMethod: string;
-}
-
-type ReportsScreenProps = {
-  navigation: StackNavigationProp<RootStackParamList, 'Reports'>;
-};
-
-const periodOptions = [
-  { label: 'Daily', value: 'daily' },
-  { label: 'Weekly', value: 'weekly' },
-  { label: 'Monthly', value: 'monthly' },
-  { label: 'Yearly', value: 'yearly' },
+const quickRanges: { label: string; value: RangeMode }[] = [
+  { label: 'Today', value: 'today' },
+  { label: '7 days', value: 'last7Days' },
+  { label: 'Month', value: 'thisMonth' },
+  { label: 'Custom', value: 'custom' },
 ];
 
-const ReportsScreen: React.FC<ReportsScreenProps> = ({ navigation }) => {
+const escapeHtml = (value: string) => value
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;');
+
+const buildReportHtml = (
+  report: SalesReportSummary,
+  label: string,
+  formatCurrency: (value: number) => string
+) => `
+  <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 24px; color: #111827; }
+        h1 { margin: 0 0 4px; }
+        .muted { color: #4b5563; font-size: 12px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 20px 0; }
+        .card { border: 1px solid #d1d5db; padding: 12px; border-radius: 8px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+        th { background: #f3f4f6; text-transform: uppercase; font-size: 12px; }
+        th, td { padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: left; }
+        td:last-child, th:last-child { text-align: right; }
+      </style>
+    </head>
+    <body>
+      <h1>Sales Report</h1>
+      <div class="muted">${escapeHtml(label)}</div>
+      <div class="grid">
+        <div class="card"><strong>Total sales</strong><br/>${formatCurrency(report.totalSales)}</div>
+        <div class="card"><strong>Bills</strong><br/>${report.totalBills}</div>
+        <div class="card"><strong>Items sold</strong><br/>${report.totalItems}</div>
+        <div class="card"><strong>Average bill</strong><br/>${formatCurrency(report.averageBillValue)}</div>
+      </div>
+      <h2>Payment Modes</h2>
+      <table>
+        <thead><tr><th>Mode</th><th>Bills</th><th>Total</th></tr></thead>
+        <tbody>${report.payments.map((payment) => `<tr><td>${escapeHtml(payment.method)}</td><td>${payment.count}</td><td>${formatCurrency(payment.total)}</td></tr>`).join('')}</tbody>
+      </table>
+      <h2>Top Products</h2>
+      <table>
+        <thead><tr><th>Product</th><th>Qty</th><th>Revenue</th></tr></thead>
+        <tbody>${report.topProductsByRevenue.map((product) => `<tr><td>${escapeHtml(product.name)}</td><td>${product.quantity}</td><td>${formatCurrency(product.totalSales)}</td></tr>`).join('')}</tbody>
+      </table>
+    </body>
+  </html>
+`;
+
+const startOfDay = (date: Date) => {
+  const next = new Date(date);
+  next.setHours(0, 0, 0, 0);
+  return next;
+};
+
+const endOfDay = (date: Date) => {
+  const next = new Date(date);
+  next.setHours(23, 59, 59, 999);
+  return next;
+};
+
+const ReportsScreen: React.FC = () => {
   const { theme } = useTheme();
+  const currency = useCurrency();
   const styles = createStyles(theme);
-  
+  const [rangeMode, setRangeMode] = useState<RangeMode>('today');
+  const [customStart, setCustomStart] = useState(startOfDay(new Date()));
+  const [customEnd, setCustomEnd] = useState(endOfDay(new Date()));
+  const [datePickerTarget, setDatePickerTarget] = useState<'start' | 'end' | null>(null);
+  const [report, setReport] = useState<SalesReportSummary | null>(null);
   const [loading, setLoading] = useState(true);
-  const [reports, setReports] = useState<SalesReport | null>(null);
-  const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('daily');
-  const [customDate, setCustomDate] = useState(new Date());
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showPeriodPicker, setShowPeriodPicker] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const reqRef = useRef(0);
+  const hasLoadedRef = useRef(false);
+  const dialog = useDialog();
+  const showSkeleton = useDelayedFlag(loading);
+
+  const label = useMemo(() => {
+    if (rangeMode === 'today') {
+      return 'Today';
+    }
+    if (rangeMode === 'last7Days') {
+      return 'Last 7 days';
+    }
+    if (rangeMode === 'thisMonth') {
+      return 'This month';
+    }
+    return `${customStart.toLocaleDateString()} - ${customEnd.toLocaleDateString()}`;
+  }, [customEnd, customStart, rangeMode]);
 
   useEffect(() => {
-    fetchReports();
-  }, [period, customDate]);
-
-  const fetchReports = async () => {
-    setLoading(true);
-    try {
-      const billsJSON = await AsyncStorage.getItem('bills');
-      if (!billsJSON) {
-        setReports(null);
-        return;
-      }
-
-      const allBills: Bill[] = JSON.parse(billsJSON);
-      const filteredBills = filterBillsByPeriod(allBills, period, customDate);
-      const report = generateSalesReport(filteredBills);
-      
-      setReports(report);
-    } catch (error) {
-      console.error('Error fetching reports:', error);
-      Alert.alert('Error', 'Failed to load sales reports');
-    } finally {
-      setLoading(false);
+    const requestId = ++reqRef.current;
+    // Keep the current report on screen while a new range loads (no full-screen
+    // remount). Only the very first load shows the skeleton; range switches show
+    // a subtle inline "Updating" indicator. Stale responses are ignored.
+    if (!hasLoadedRef.current) {
+      setLoading(true);
+    } else {
+      setRefreshing(true);
     }
-  };
-
-  const filterBillsByPeriod = (bills: Bill[], period: string, date: Date): Bill[] => {
-    const targetDate = new Date(date);
-    
-    return bills.filter(bill => {
-      const billDate = new Date(bill.timestamp);
-      
-      switch (period) {
-        case 'daily':
-          return (
-            billDate.getDate() === targetDate.getDate() &&
-            billDate.getMonth() === targetDate.getMonth() &&
-            billDate.getFullYear() === targetDate.getFullYear()
-          );
-        case 'weekly':
-          const weekStart = new Date(targetDate);
-          weekStart.setDate(targetDate.getDate() - targetDate.getDay());
-          const weekEnd = new Date(weekStart);
-          weekEnd.setDate(weekStart.getDate() + 6);
-          return billDate >= weekStart && billDate <= weekEnd;
-        case 'monthly':
-          return (
-            billDate.getMonth() === targetDate.getMonth() &&
-            billDate.getFullYear() === targetDate.getFullYear()
-          );
-        case 'yearly':
-          return billDate.getFullYear() === targetDate.getFullYear();
-        default:
-          return true;
-      }
-    });
-  };
-
-  const generateSalesReport = (bills: Bill[]): SalesReport => {
-    const itemsMap = new Map<string, ReportItem>();
-    let totalSales = 0;
-    let totalItems = 0;
-
-    bills.forEach(bill => {
-      totalSales += bill.total;
-      bill.items.forEach(item => {
-        totalItems += item.quantity;
-        const existingItem = itemsMap.get(item.id);
-        
-        if (existingItem) {
-          existingItem.quantity += item.quantity;
-          existingItem.totalSales += item.total;
-        } else {
-          itemsMap.set(item.id, {
-            id: item.id,
-            name: item.name,
-            quantity: item.quantity,
-            totalSales: item.total
-          });
+    const loadReport = async () => {
+      try {
+        const data = rangeMode === 'custom'
+          ? await storageService.getSalesReportForRange(customStart.getTime(), customEnd.getTime(), label)
+          : await storageService.getSalesReportByPreset(rangeMode, new Date());
+        if (reqRef.current === requestId) {
+          setReport({ ...data, label });
+          hasLoadedRef.current = true;
         }
-      });
-    });
-
-    return {
-      period: getPeriodLabel(period, customDate),
-      totalSales,
-      totalItems,
-      items: Array.from(itemsMap.values()).sort((a, b) => b.totalSales - a.totalSales)
+      } catch (error) {
+        console.error('Report load failed:', error);
+        if (reqRef.current === requestId) {
+          void dialog.alert({ title: 'Reports unavailable', message: 'Unable to load sales reports from the local database.' });
+        }
+      } finally {
+        if (reqRef.current === requestId) {
+          setLoading(false);
+          setRefreshing(false);
+        }
+      }
     };
-  };
+    void loadReport();
+  }, [customEnd, customStart, label, rangeMode, dialog]);
 
-  const getPeriodLabel = (period: string, date: Date): string => {
-    const options: Intl.DateTimeFormatOptions = { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    };
-    
-    switch (period) {
-      case 'daily':
-        return date.toLocaleDateString(undefined, options);
-      case 'weekly':
-        const weekStart = new Date(date);
-        weekStart.setDate(date.getDate() - date.getDay());
-        const weekEnd = new Date(weekStart);
-        weekEnd.setDate(weekStart.getDate() + 6);
-        return `${weekStart.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} - 
-                ${weekEnd.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`;
-      case 'monthly':
-        return date.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
-      case 'yearly':
-        return date.toLocaleDateString(undefined, { year: 'numeric' });
-      default:
-        return '';
+  const sharePdf = async () => {
+    if (!report) {
+      return;
     }
-  };
-
-  const generatePDF = async () => {
-    if (!reports) return;
-
+    setSharing(true);
     try {
-      const html = `
-        <html>
-          <head>
-            <style>
-              body { font-family: Arial; padding: 20px; }
-              .header { text-align: center; margin-bottom: 20px; }
-              .title { font-size: 24px; font-weight: bold; }
-              .period { font-size: 16px; color: #666; margin-bottom: 10px; }
-              .summary { display: flex; justify-content: space-between; margin-bottom: 20px; }
-              .divider { border-top: 1px dashed #000; margin: 15px 0; }
-              .table { width: 100%; border-collapse: collapse; }
-              .table th { text-align: left; padding: 8px; background: #f2f2f2; }
-              .table td { padding: 8px; border-bottom: 1px solid #ddd; }
-              .total-row { font-weight: bold; }
-              .footer { margin-top: 30px; text-align: center; font-size: 12px; color: #666; }
-            </style>
-          </head>
-          <body>
-            <div class="header">
-              <div class="title">Sales Report</div>
-              <div class="period">${reports.period}</div>
-            </div>
-            
-            <div class="summary">
-              <div>Total Sales: $${reports.totalSales.toFixed(2)}</div>
-              <div>Items Sold: ${reports.totalItems}</div>
-            </div>
-            
-            <div class="divider"></div>
-            
-            <table class="table">
-              <thead>
-                <tr>
-                  <th>Item</th>
-                  <th>Quantity</th>
-                  <th>Total Sales</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${reports.items.map(item => `
-                  <tr>
-                    <td>${item.name}</td>
-                    <td>${item.quantity}</td>
-                    <td>$${item.totalSales.toFixed(2)}</td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-            
-            <div class="footer">Generated on ${new Date().toLocaleDateString()}</div>
-          </body>
-        </html>
-      `;
-
-      const { uri } = await Print.printToFileAsync({ html });
-      await Sharing.shareAsync(uri);
+      const { uri } = await Print.printToFileAsync({ html: buildReportHtml(report, label, currency.format) });
+      if (Platform.OS === 'android' && await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, { dialogTitle: `Share ${label} report` });
+      } else {
+        await Share.share({ title: `${label} report`, url: uri });
+      }
     } catch (error) {
-      console.error('Error generating PDF:', error);
-      Alert.alert('Error', 'Failed to generate PDF report');
+      void dialog.alert({ title: 'Export failed', message: (error as Error).message });
+    } finally {
+      setSharing(false);
     }
-  };
-
-  const handleDateChange = (date?: Date) => {
-    setShowDatePicker(false);
-    if (date) {
-      setCustomDate(date);
-    }
-  };
-
-  const selectPeriod = (value: 'daily' | 'weekly' | 'monthly' | 'yearly') => {
-    setPeriod(value);
-    setShowPeriodPicker(false);
   };
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={theme.primary} />
-      </View>
+      <AppScreen theme={theme} scroll={false}>
+        {showSkeleton ? (
+          <View style={{ paddingTop: 4 }}>
+            <Skeleton theme={theme} height={44} radius={8} style={{ marginBottom: 12 }} />
+            <View style={styles.statsGrid}>
+              <Skeleton theme={theme} height={96} radius={16} style={{ flex: 1 }} />
+              <Skeleton theme={theme} height={96} radius={16} style={{ flex: 1 }} />
+            </View>
+            {Array.from({ length: 3 }).map((_, index) => (
+              <Skeleton key={index} theme={theme} height={120} radius={16} style={{ marginBottom: 12 }} />
+            ))}
+          </View>
+        ) : null}
+      </AppScreen>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Sales Reports</Text>
-          
-          <View style={styles.periodSelector}>
-            <TouchableOpacity
-              style={styles.periodButton}
-              onPress={() => setShowPeriodPicker(true)}
-            >
-              <Text style={styles.periodButtonText}>
-                {periodOptions.find(p => p.value === period)?.label}
-              </Text>
-              <MaterialIcons name="arrow-drop-down" size={24} color={theme.text} />
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={styles.dateButton}
-              onPress={() => setShowDatePicker(true)}
-            >
-              <MaterialIcons name="date-range" size={24} color={theme.primary} />
-            </TouchableOpacity>
-          </View>
-          
-          {showDatePicker && (
-            <DateTimePicker
-              value={customDate}
-              onChange={(event, date) => handleDateChange(date)}
-              mode="date"
-            />
-          )}
-        </View>
+    <AppScreen
+      theme={theme}
+      footer={report && report.totalBills > 0 ? (
+        <BottomActionBar theme={theme}>
+          <AppButton theme={theme} label="Share PDF Report" onPress={sharePdf} loading={sharing} />
+        </BottomActionBar>
+      ) : undefined}
+    >
+      <View style={styles.compactHeader}>
+        <Text style={styles.subtitle}>
+          {refreshing ? 'Updating…' : 'Sales, payments, stock & product movement'}
+        </Text>
+        <TouchableOpacity style={styles.dateButton} onPress={() => setDatePickerTarget('start')}>
+          <MaterialIcons name="date-range" size={22} color={theme.primary} />
+        </TouchableOpacity>
+      </View>
 
-        {reports ? (
-          <>
-            <View style={styles.summaryContainer}>
-              <Text style={styles.periodText}>{reports.period}</Text>
-              
-              <View style={styles.summaryRow}>
-                <View style={styles.summaryCard}>
-                  <Text style={styles.summaryLabel}>Total Sales</Text>
-                  <Text style={styles.summaryValue}>${reports.totalSales.toFixed(2)}</Text>
-                </View>
-                
-                <View style={styles.summaryCard}>
-                  <Text style={styles.summaryLabel}>Items Sold</Text>
-                  <Text style={styles.summaryValue}>{reports.totalItems}</Text>
-                </View>
-              </View>
-            </View>
-
-            <View style={styles.reportHeader}>
-              <Text style={styles.reportHeaderText}>ITEMS SOLD</Text>
-            </View>
-
-            {reports.items.map((item, index) => (
-              <View key={`${item.id}-${index}`} style={styles.itemRow}>
-                <View style={styles.itemInfo}>
-                  <Text style={styles.itemName}>{item.name}</Text>
-                  <Text style={styles.itemQuantity}>Quantity: {item.quantity}</Text>
-                </View>
-                <Text style={styles.itemTotal}>${item.totalSales.toFixed(2)}</Text>
-              </View>
-            ))}
-          </>
-        ) : (
-          <View style={styles.emptyContainer}>
-            <MaterialIcons name="receipt" size={48} color={theme.textSecondary} />
-            <Text style={styles.emptyText}>No sales data available</Text>
-            <Text style={styles.emptySubtext}>for the selected period</Text>
-          </View>
-        )}
-      </ScrollView>
-
-      {reports && (
-        <View style={styles.footer}>
+      <View style={styles.periodRow}>
+        {quickRanges.map((option) => (
           <TouchableOpacity
-            style={[styles.footerButton, { backgroundColor: theme.primary }]}
-            onPress={generatePDF}
+            key={option.value}
+            style={[styles.periodPill, rangeMode === option.value && styles.periodPillActive]}
+            onPress={() => setRangeMode(option.value)}
           >
-            <FontAwesome5 name="file-pdf" size={20} color="white" />
-            <Text style={styles.footerButtonText}>Generate PDF</Text>
+            <Text style={[styles.periodText, rangeMode === option.value && styles.periodTextActive]}>{option.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {rangeMode === 'custom' ? (
+        <View style={styles.customRow}>
+          <TouchableOpacity style={styles.customDate} onPress={() => setDatePickerTarget('start')}>
+            <Text style={styles.customLabel}>From</Text>
+            <Text style={styles.customValue}>{customStart.toLocaleDateString()}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.customDate} onPress={() => setDatePickerTarget('end')}>
+            <Text style={styles.customLabel}>To</Text>
+            <Text style={styles.customValue}>{customEnd.toLocaleDateString()}</Text>
           </TouchableOpacity>
         </View>
-      )}
+      ) : null}
 
-      {/* Period Picker Modal */}
-      <Modal
-        visible={showPeriodPicker}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowPeriodPicker(false)}
-      >
-        <TouchableWithoutFeedback onPress={() => setShowPeriodPicker(false)}>
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { backgroundColor: theme.cardBackground }]}>
-              {periodOptions.map((option) => (
-                <TouchableOpacity
-                  key={option.value}
-                  style={styles.modalOption}
-                  onPress={() => selectPeriod(option.value as any)}
-                >
-                  <Text style={[styles.modalOptionText, { color: theme.text }]}>
-                    {option.label}
-                  </Text>
-                  {period === option.value && (
-                    <MaterialIcons name="check" size={24} color={theme.primary} />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </View>
+      {datePickerTarget ? (
+        <DateTimePicker
+          value={datePickerTarget === 'start' ? customStart : customEnd}
+          mode="date"
+          onChange={(_, date) => {
+            if (date) {
+              if (datePickerTarget === 'start') {
+                setCustomStart(startOfDay(date));
+              } else {
+                setCustomEnd(endOfDay(date));
+              }
+              setRangeMode('custom');
+            }
+            setDatePickerTarget(null);
+          }}
+        />
+      ) : null}
+
+      {report && report.totalBills > 0 ? (
+        <>
+          <View style={styles.statsGrid}>
+            <StatCard theme={theme} label="Sales" value={currency.format(report.totalSales)} hint={label} />
+            <StatCard theme={theme} label="Bills" value={`${report.totalBills}`} hint={`Avg ${currency.format(report.averageBillValue)}`} />
           </View>
-        </TouchableWithoutFeedback>
-      </Modal>
-    </SafeAreaView>
+          <View style={styles.statsGrid}>
+            <StatCard theme={theme} label="Items sold" value={`${report.totalItems}`} hint="Persisted sale items" />
+            <StatCard theme={theme} label="Low stock" value={`${report.lowStock.length}`} hint="Needs attention" />
+          </View>
+
+          <AppCard theme={theme} style={styles.section}>
+            <SectionHeader theme={theme} title="Daily sales trend" subtitle="Lightweight chart from saved bills" />
+            <InsightBars
+              theme={theme}
+              data={report.dailySalesTrend.map((point) => ({
+                label: point.label,
+                value: point.sales,
+                caption: `${point.bills} bills`,
+              }))}
+              valueFormatter={currency.format}
+            />
+          </AppCard>
+
+          <AppCard theme={theme} style={styles.section}>
+            <SectionHeader theme={theme} title="Payment breakdown" right={<AppBadge theme={theme} label={`${report.payments.length}`} />} />
+            <InsightBars
+              theme={theme}
+              data={report.payments.map((payment) => ({
+                label: payment.method,
+                value: payment.total,
+                caption: `${payment.count} payments - ${payment.percentage}%`,
+              }))}
+              valueFormatter={currency.format}
+            />
+          </AppCard>
+
+          <AppCard theme={theme} style={styles.section}>
+            <SectionHeader theme={theme} title="Most sold products" subtitle="By quantity" />
+            <InsightBars
+              theme={theme}
+              data={report.topProductsByQuantity.slice(0, 8).map((product) => ({
+                label: product.name,
+                value: product.quantity,
+                caption: currency.format(product.totalSales),
+              }))}
+            />
+          </AppCard>
+
+          <AppCard theme={theme} style={styles.section}>
+            <SectionHeader theme={theme} title="Highest revenue products" subtitle="By sales amount" />
+            <InsightBars
+              theme={theme}
+              data={report.topProductsByRevenue.slice(0, 8).map((product) => ({
+                label: product.name,
+                value: product.totalSales,
+                caption: `${product.quantity} sold`,
+              }))}
+              valueFormatter={currency.format}
+            />
+          </AppCard>
+
+          <AppCard theme={theme} style={styles.section}>
+            <SectionHeader theme={theme} title="Low-stock products" right={<AppBadge theme={theme} label={`${report.lowStock.length}`} tone={report.lowStock.length ? 'warning' : 'success'} />} />
+            {report.lowStock.length ? (
+              report.lowStock.slice(0, 8).map((item) => (
+                <View key={item.barcode} style={styles.row}>
+                  <View style={styles.productInfo}>
+                    <Text style={styles.rowLabel}>{item.name}</Text>
+                    <Text style={styles.muted}>{item.barcode}</Text>
+                  </View>
+                  <AppBadge theme={theme} label={`${item.quantity} left`} tone="warning" />
+                </View>
+              ))
+            ) : (
+              <Text style={styles.muted}>No low-stock products in the current catalog.</Text>
+            )}
+          </AppCard>
+        </>
+      ) : (
+        <AppCard theme={theme}>
+          <AppEmptyState theme={theme} title="No sales in this range" message="Create a saved bill and it will appear here immediately." />
+        </AppCard>
+      )}
+    </AppScreen>
   );
 };
 
-const createStyles = (theme: any) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.background,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  scrollContainer: {
-    padding: 20,
-    paddingBottom: 100,
-  },
-  header: {
-    marginBottom: 20,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: theme.text,
-    marginBottom: 15,
-  },
-  periodSelector: {
+const createStyles = (theme: Theme) => StyleSheet.create({
+  compactHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 15,
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    gap: 12,
   },
-  periodButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.cardBackground,
-    borderRadius: 8,
-    padding: 15,
-    marginRight: 10,
-  },
-  periodButtonText: {
-    flex: 1,
-    fontSize: 16,
-    color: theme.text,
-  },
+  subtitle: { color: theme.textSecondary, ...typography.caption, flex: 1 },
   dateButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.cardBackground,
+    borderWidth: 1,
+    borderColor: theme.divider,
+  },
+  periodRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  periodPill: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.cardBackground,
+    borderWidth: 1,
+    borderColor: theme.divider,
+  },
+  periodPillActive: { backgroundColor: theme.primary, borderColor: theme.primary },
+  periodText: { color: theme.textSecondary, ...typography.caption },
+  periodTextActive: { color: '#ffffff' },
+  customRow: { flexDirection: 'row', gap: 12, marginBottom: 12 },
+  customDate: {
+    flex: 1,
+    minHeight: 54,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.divider,
+    backgroundColor: theme.cardBackground,
     padding: 10,
   },
-  summaryContainer: {
-    marginBottom: 20,
-  },
-  periodText: {
-    fontSize: 18,
-    color: theme.textSecondary,
-    marginBottom: 10,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  summaryCard: {
-    flex: 1,
-    backgroundColor: theme.cardBackground,
-    borderRadius: 8,
-    padding: 15,
-    marginHorizontal: 5,
-  },
-  summaryLabel: {
-    fontSize: 14,
-    color: theme.textSecondary,
-    marginBottom: 5,
-  },
-  summaryValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: theme.primary,
-  },
-  reportHeader: {
-    marginTop: 15,
-    marginBottom: 10,
-  },
-  reportHeaderText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: theme.textSecondary,
-  },
-  itemRow: {
+  customLabel: { color: theme.textSecondary, ...typography.caption },
+  customValue: { color: theme.text, ...typography.bodyStrong, marginTop: 2 },
+  statsGrid: { flexDirection: 'row', gap: 12, marginBottom: 12 },
+  section: { marginBottom: 12 },
+  row: {
+    minHeight: 48,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: theme.cardBackground,
-    borderRadius: 8,
-    padding: 15,
-    marginBottom: 10,
-  },
-  itemInfo: {
-    flex: 1,
-  },
-  itemName: {
-    fontSize: 16,
-    color: theme.text,
-    marginBottom: 5,
-  },
-  itemQuantity: {
-    fontSize: 14,
-    color: theme.textSecondary,
-  },
-  itemTotal: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: theme.text,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    padding: 40,
-  },
-  emptyText: {
-    fontSize: 18,
-    color: theme.text,
-    marginTop: 15,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: theme.textSecondary,
-    marginTop: 5,
-  },
-  footer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 15,
-    backgroundColor: theme.cardBackground,
     borderTopWidth: 1,
     borderTopColor: theme.divider,
+    gap: 12,
+    paddingVertical: 10,
   },
-  footerButton: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 15,
-    borderRadius: 8,
-  },
-  footerButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 10,
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  modalContent: {
-    width: '80%',
-    borderRadius: 10,
-    padding: 20,
-  },
-  modalOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.divider,
-  },
-  modalOptionText: {
-    flex: 1,
-    fontSize: 16,
-  },
+  productInfo: { flex: 1 },
+  rowLabel: { color: theme.text, ...typography.bodyStrong },
+  muted: { color: theme.textSecondary, ...typography.caption, marginTop: 2 },
 });
 
 export default ReportsScreen;

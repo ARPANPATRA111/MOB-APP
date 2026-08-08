@@ -1,0 +1,56 @@
+# Files excluded from the archive uploaded to EAS Build.
+#
+# EAS uses this file INSTEAD of .gitignore when it exists, so it must repeat the
+# entries that matter. Without it the upload was 527 MB, because the local Gradle
+# and CMake output under android/ was being shipped to a machine that rebuilds
+# all of it from scratch anyway.
+
+# --- Local Android build output (the big one: ~1.6 GB) ---
+android/build/
+android/app/build/
+android/app/.cxx/
+android/.gradle/
+android/.idea/
+android/local.properties
+android/captures/
+*.apk
+*.aab
+*.hprof
+
+# --- Local iOS build output ---
+ios/build/
+ios/Pods/
+ios/*.xcworkspace/xcuserdata/
+
+# --- Installed by EAS on the build machine ---
+node_modules/
+.git/
+.expo/
+dist/
+web-build/
+
+# --- Not used by the build ---
+docs/
+*.md
+!README.md
+src/__tests__/
+src/**/__tests__/
+src/stress/
+*.test.ts
+*.test.tsx
+
+# --- Local junk ---
+ic_launcher.zip
+guid.txt
+prompt.txt
+*.log
+.DS_Store
+.vscode/
+.idea/
+
+# --- Never upload signing material ---
+*.jks
+*.keystore
+!android/app/debug.keystore
+keystore.properties
+credentials.json

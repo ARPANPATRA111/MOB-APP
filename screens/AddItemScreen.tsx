@@ -1,32 +1,34 @@
 // AddItemScreen.tsx
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
-  Alert,
   TextInput,
   KeyboardAvoidingView,
   Platform,
   Image,
   ActivityIndicator,
   ScrollView,
-  Modal
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CameraView, BarcodeScanningResult, Camera } from 'expo-camera';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Audio } from 'expo-av';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { FontAwesome5, Ionicons } from '@expo/vector-icons';
-import { useTheme } from '../src/contexts/ThemeContext';
+import { useTheme, type Theme } from '../src/contexts/ThemeContext';
 import { RootStackParamList } from '../App';
 import BarcodeInputModal from '../src/components/BarcodeInputModal';
+import { storageService } from '../src/services/storage';
+import { classifyBarcode } from '../src/domain/barcode';
+import { normalizeName } from '../src/domain/validation';
+import { useToast } from '../src/components/ui/ToastProvider';
+import { useDialog } from '../src/components/ui/DialogProvider';
 
 type AddItemScreenProps = {
   navigation: StackNavigationProp<RootStackParamList, 'AddItem'>;
@@ -43,6 +45,9 @@ interface Item {
 
 const AddItemScreen: React.FC<AddItemScreenProps> = ({ navigation }) => {
   const { theme } = useTheme();
+  const toast = useToast();
+  const dialog = useDialog();
+  const insets = useSafeAreaInsets();
   const styles = createStyles(theme);
 
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
@@ -52,38 +57,34 @@ const AddItemScreen: React.FC<AddItemScreenProps> = ({ navigation }) => {
   const [quantity, setQuantity] = useState('1');
   const [price, setPrice] = useState('');
   const [productImage, setProductImage] = useState<string | null>(null);
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [existingProduct, setExistingProduct] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showBarcodeInput, setShowBarcodeInput] = useState(false);
-  const [manualBarcode, setManualBarcode] = useState('');
   const [categories, setCategories] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
 
   const soundRef = useRef<Audio.Sound | null>(null);
+  // Ref guard prevents duplicate onBarcodeScanned callbacks firing before the
+  // `scanned` state commits (a real race with the camera callback).
+  const processingRef = useRef(false);
 
   useEffect(() => {
     (async () => {
-      // Request camera permission
-      const { status: cameraStatus } = await Camera.requestCameraPermissionsAsync();
-      setHasPermission(cameraStatus === 'granted');
-
-      // Request camera roll permission
-      await ImagePicker.requestCameraPermissionsAsync();
-      await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-      // Load sound
-      await loadSound();
-
-      // Create product images directory if it doesn't exist
-      await ensureDirectoryExists();
-
-      // Load categories
-      await loadCategories();
+      try {
+        const { status: cameraStatus } = await Camera.requestCameraPermissionsAsync();
+        setHasPermission(cameraStatus === 'granted');
+        await ImagePicker.requestCameraPermissionsAsync();
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+        await loadSound();
+        await ensureDirectoryExists();
+        await loadCategories();
+      } catch (error) {
+        console.error('Add item init failed:', error);
+        setHasPermission((current) => (current === null ? false : current));
+      }
     })();
 
     return () => {
-      // Clean up sound when component unmounts
       if (soundRef.current) {
         soundRef.current.unloadAsync();
       }
@@ -92,10 +93,8 @@ const AddItemScreen: React.FC<AddItemScreenProps> = ({ navigation }) => {
 
   const loadCategories = async () => {
     try {
-      const categoriesJSON = await AsyncStorage.getItem('categories');
-      if (categoriesJSON) {
-        setCategories(JSON.parse(categoriesJSON));
-      }
+      const storedCategories = await storageService.getCategories();
+      setCategories(storedCategories);
     } catch (error) {
       console.error('Error loading categories:', error);
     }
@@ -112,12 +111,8 @@ const AddItemScreen: React.FC<AddItemScreenProps> = ({ navigation }) => {
 
   const loadSound = async () => {
     try {
-      // Load the sound file
-      const { sound } = await Audio.Sound.createAsync(
-        require('../assets/BEEP_SOUND.mp3')
-      );
+      const { sound } = await Audio.Sound.createAsync(require('../assets/BEEP_SOUND.mp3'));
       soundRef.current = sound;
-      setSound(sound);
     } catch (error) {
       console.error('Error loading sound:', error);
     }
@@ -135,12 +130,8 @@ const AddItemScreen: React.FC<AddItemScreenProps> = ({ navigation }) => {
 
   const checkRemovedBarcode = async (barcode: string): Promise<boolean> => {
     try {
-      const removedBarcodesJSON = await AsyncStorage.getItem('removedBarcodes');
-      if (removedBarcodesJSON) {
-        const removedBarcodes: string[] = JSON.parse(removedBarcodesJSON);
-        return removedBarcodes.includes(barcode);
-      }
-      return false;
+      const removedBarcodes = await storageService.getRemovedBarcodes();
+      return removedBarcodes.includes(barcode);
     } catch (error) {
       console.error('Error checking removed barcodes:', error);
       return false;
@@ -149,12 +140,9 @@ const AddItemScreen: React.FC<AddItemScreenProps> = ({ navigation }) => {
 
   const removeFromRemovedBarcodes = async (barcode: string) => {
     try {
-      const removedBarcodesJSON = await AsyncStorage.getItem('removedBarcodes');
-      if (removedBarcodesJSON) {
-        const removedBarcodes: string[] = JSON.parse(removedBarcodesJSON);
-        const updatedList = removedBarcodes.filter(code => code !== barcode);
-        await AsyncStorage.setItem('removedBarcodes', JSON.stringify(updatedList));
-      }
+      const removedBarcodes = await storageService.getRemovedBarcodes();
+      const updatedList = removedBarcodes.filter((code) => code !== barcode);
+      await storageService.saveRemovedBarcodes(updatedList);
     } catch (error) {
       console.error('Error updating removed barcodes list:', error);
     }
@@ -162,12 +150,8 @@ const AddItemScreen: React.FC<AddItemScreenProps> = ({ navigation }) => {
 
   const findExistingItem = async (barcode: string): Promise<Item | null> => {
     try {
-      const inventoryJSON = await AsyncStorage.getItem('inventory');
-      if (inventoryJSON) {
-        const inventory: Item[] = JSON.parse(inventoryJSON);
-        return inventory.find(item => item.barcode === barcode) || null;
-      }
-      return null;
+      const inventory = await storageService.getInventory();
+      return inventory.find((item) => item.barcode === barcode) || null;
     } catch (error) {
       console.error('Error finding existing item:', error);
       return null;
@@ -175,88 +159,82 @@ const AddItemScreen: React.FC<AddItemScreenProps> = ({ navigation }) => {
   };
 
   const handleBarCodeScanned = async (result: BarcodeScanningResult) => {
-    if (scanned) return;
+    if (processingRef.current || scanned || showBarcodeInput) {
+      return;
+    }
+    processingRef.current = true;
+
+    const classification = classifyBarcode(result.data);
+    if (classification.suspicious) {
+      // Release the lock so the confirm dialog (which covers the camera) doesn't
+      // leave the scanner permanently stuck if the user chooses to rescan.
+      processingRef.current = false;
+      const proceed = await dialog.confirm({
+        title: 'Unusual barcode',
+        message: `${classification.reason ?? 'This code looks unusual'}. Use "${classification.digits || result.data}" anyway?`,
+        confirmText: 'Use anyway',
+        cancelText: 'Rescan',
+      });
+      if (!proceed) {
+        return;
+      }
+      processingRef.current = true;
+    }
 
     setScanned(true);
-    const { data, type } = result;
-
-    console.log(`Barcode with type ${type} and data ${data} has been scanned!`);
-    await processScannedBarcode(data);
+    await processScannedBarcode(classification.digits || result.data.trim());
   };
 
   const processScannedBarcode = async (barcode: string) => {
-    // Play beep sound
     await playSound();
-
-    // Reset state
     setExistingProduct(false);
 
-    // Check if barcode was previously removed
     const wasRemoved = await checkRemovedBarcode(barcode);
 
-    // Check if this item exists in inventory (and wasn't previously removed)
     if (!wasRemoved) {
       const existingItem = await findExistingItem(barcode);
-
       if (existingItem) {
-        // Auto-fill fields from existing item
         setItemName(existingItem.name);
         setPrice(existingItem.price.toString());
         setQuantity('1');
         setSelectedCategory(existingItem.category || '');
         setExistingProduct(true);
-
-        Alert.alert(
-          'Product Found',
-          `"${existingItem.name}" already exists in inventory with ${existingItem.quantity} units.`,
-          [{ text: 'OK' }]
-        );
+        toast.showToast({
+          message: `"${existingItem.name}" exists — new quantity will be added`,
+          variant: 'info',
+          duration: 3200,
+        });
       } else {
-        // New product
         setItemName('');
         setPrice('');
         setQuantity('1');
         setSelectedCategory('');
       }
     } else {
-      // Previously removed product is treated as new
       setItemName('');
       setPrice('');
       setQuantity('1');
       setSelectedCategory('');
     }
 
-    // Create initial item object
-    const scanResult: Item = {
-      barcode,
-      name: '',
-      quantity: 1,
-      price: 0,
-      category: selectedCategory
-    };
-
-    setScannedItem(scanResult);
+    setScannedItem({ barcode, name: '', quantity: 1, price: 0, category: selectedCategory });
     setProductImage(null);
   };
 
   const captureProductImage = async () => {
     try {
-      // Launch camera
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
       });
-
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        // Compress the image
-        const compressed = await compressImage(result.assets[0].uri);
-        setProductImage(compressed);
+        setProductImage(await compressImage(result.assets[0].uri));
       }
     } catch (error) {
       console.error('Error capturing image:', error);
-      Alert.alert('Error', 'Failed to capture image');
+      void dialog.alert({ title: 'Camera error', message: 'Failed to capture image.' });
     }
   };
 
@@ -268,24 +246,21 @@ const AddItemScreen: React.FC<AddItemScreenProps> = ({ navigation }) => {
         aspect: [4, 3],
         quality: 0.8,
       });
-
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        const compressed = await compressImage(result.assets[0].uri);
-        setProductImage(compressed);
+        setProductImage(await compressImage(result.assets[0].uri));
       }
     } catch (error) {
       console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to select image');
+      void dialog.alert({ title: 'Image error', message: 'Failed to select image.' });
     }
   };
 
   const compressImage = async (uri: string): Promise<string> => {
     try {
-      const result = await ImageManipulator.manipulateAsync(
-        uri,
-        [{ resize: { width: 800 } }],
-        { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
-      );
+      const result = await ImageManipulator.manipulateAsync(uri, [{ resize: { width: 800 } }], {
+        compress: 0.7,
+        format: ImageManipulator.SaveFormat.JPEG,
+      });
       return result.uri;
     } catch (error) {
       console.error('Error compressing image:', error);
@@ -298,19 +273,11 @@ const AddItemScreen: React.FC<AddItemScreenProps> = ({ navigation }) => {
       const fileName = `product_${barcode}.jpg`;
       const directory = await ensureDirectoryExists();
       const newUri = directory + fileName;
-
-      // Check if a previous image exists and delete it
       const fileInfo = await FileSystem.getInfoAsync(newUri);
       if (fileInfo.exists) {
         await FileSystem.deleteAsync(newUri, { idempotent: true });
       }
-
-      // Copy the new image
-      await FileSystem.copyAsync({
-        from: imageUri,
-        to: newUri
-      });
-
+      await FileSystem.copyAsync({ from: imageUri, to: newUri });
       return newUri;
     } catch (error) {
       console.error('Error saving image:', error);
@@ -321,9 +288,8 @@ const AddItemScreen: React.FC<AddItemScreenProps> = ({ navigation }) => {
   const addItemToInventory = async () => {
     if (!scannedItem) return;
 
-    // Validate inputs
     if (!itemName.trim()) {
-      Alert.alert('Invalid Input', 'Please enter a product name');
+      void dialog.alert({ title: 'Name required', message: 'Please enter a product name.' });
       return;
     }
 
@@ -331,102 +297,98 @@ const AddItemScreen: React.FC<AddItemScreenProps> = ({ navigation }) => {
     const priceNum = parseFloat(price);
 
     if (isNaN(quantityNum) || quantityNum <= 0) {
-      Alert.alert('Invalid Input', 'Please enter a valid quantity');
+      void dialog.alert({ title: 'Invalid quantity', message: 'Please enter a valid quantity.' });
       return;
     }
 
     if (isNaN(priceNum) || priceNum <= 0) {
-      Alert.alert('Invalid Input', 'Please enter a valid price');
+      void dialog.alert({ title: 'Invalid price', message: 'Please enter a valid price.' });
       return;
     }
 
     setLoading(true);
 
     try {
-      // Check if barcode was previously removed
       const wasRemoved = await checkRemovedBarcode(scannedItem.barcode);
 
-      // Process image if exists
-      let savedImageUri = undefined;
+      let savedImageUri: string | undefined;
       if (productImage) {
         savedImageUri = await saveImageToStorage(scannedItem.barcode, productImage);
       }
 
-      // Get existing inventory
-      const inventoryJSON = await AsyncStorage.getItem('inventory');
-      let inventory: Item[] = inventoryJSON ? JSON.parse(inventoryJSON) : [];
+      const inventory: Item[] = await storageService.getInventory();
 
-      // Create item with user values
+      // Warn if a product with the same name but a different barcode already
+      // exists (a common source of accidental duplicate SKUs from misreads).
+      const barcodeExists = inventory.some((i) => i.barcode === scannedItem.barcode);
+      if (!barcodeExists) {
+        const trimmedName = normalizeName(itemName);
+        const similar = inventory.find(
+          (i) => normalizeName(i.name) === trimmedName && i.barcode !== scannedItem.barcode
+        );
+        if (similar) {
+          const proceed = await dialog.confirm({
+            title: 'Similar product exists',
+            message: `"${similar.name}" already exists with a different barcode (${similar.barcode}). Add this as a separate product?`,
+            confirmText: 'Add anyway',
+            cancelText: 'Cancel',
+          });
+          if (!proceed) {
+            setLoading(false);
+            return;
+          }
+        }
+      }
+
       const itemToAdd: Item = {
         ...scannedItem,
         name: itemName.trim(),
         price: priceNum,
         quantity: quantityNum,
         category: selectedCategory,
-        imageUri: savedImageUri
+        imageUri: savedImageUri,
       };
 
-      // If the barcode was previously removed, remove it from the removed list
       if (wasRemoved) {
         await removeFromRemovedBarcodes(scannedItem.barcode);
         inventory.push(itemToAdd);
-        await AsyncStorage.setItem('inventory', JSON.stringify(inventory));
-        showSuccessAlert('Item added to inventory as new product');
+        await storageService.saveInventory(inventory);
+        toast.showToast({ message: 'Product added', variant: 'success' });
       } else {
-        // Check if item already exists
-        const existingItemIndex = inventory.findIndex(i => i.barcode === itemToAdd.barcode);
-
+        const existingItemIndex = inventory.findIndex((i) => i.barcode === itemToAdd.barcode);
         if (existingItemIndex !== -1) {
-          // Update existing item
           inventory[existingItemIndex] = {
             ...inventory[existingItemIndex],
             name: itemToAdd.name,
             quantity: inventory[existingItemIndex].quantity + itemToAdd.quantity,
             price: itemToAdd.price,
-            category: itemToAdd.category
+            category: itemToAdd.category,
           };
-
-          // Only update image if a new one was provided
           if (savedImageUri) {
             inventory[existingItemIndex].imageUri = savedImageUri;
           }
-
-          await AsyncStorage.setItem('inventory', JSON.stringify(inventory));
-          showSuccessAlert('Item quantity updated in inventory');
+          await storageService.saveInventory(inventory);
+          toast.showToast({ message: 'Product quantity updated', variant: 'success' });
         } else {
-          // Add new item
           inventory.push(itemToAdd);
-          await AsyncStorage.setItem('inventory', JSON.stringify(inventory));
-          showSuccessAlert('New item added to inventory');
+          await storageService.saveInventory(inventory);
+          toast.showToast({ message: 'Product added', variant: 'success' });
         }
       }
 
-      // Reset form
       resetForm();
     } catch (error) {
       console.error('Error saving item:', error);
-      Alert.alert('Error', 'Failed to add item to inventory');
+      void dialog.alert({ title: 'Save failed', message: 'Failed to add product to inventory.' });
     } finally {
       setLoading(false);
     }
   };
 
-  const showSuccessAlert = (message: string) => {
-    Alert.alert(
-      'Success',
-      message,
-      [
-        {
-          text: 'OK',
-          // onPress: () => navigation.navigate('Inventory')
-        }
-      ]
-    );
-  };
-
   const resetForm = () => {
     setScannedItem(null);
     setScanned(false);
+    processingRef.current = false;
     setProductImage(null);
     setExistingProduct(false);
     setItemName('');
@@ -435,122 +397,92 @@ const AddItemScreen: React.FC<AddItemScreenProps> = ({ navigation }) => {
     setSelectedCategory('');
   };
 
-  const handleManualBarcodeSubmit = () => {
-    if (!manualBarcode.trim()) {
-      Alert.alert('Error', 'Please enter a barcode');
-      return;
-    }
-    setShowBarcodeInput(false);
-    processScannedBarcode(manualBarcode);
-    setManualBarcode('');
-  };
-
   if (hasPermission === null) {
     return (
       <View style={styles.permissionContainer}>
-        <Text>Requesting camera permission...</Text>
+        <ActivityIndicator color={theme.primary} size="large" />
+        <Text style={styles.permissionText}>Requesting camera permission…</Text>
       </View>
     );
   }
 
-  if (hasPermission === false) {
-    return (
-      <View style={styles.permissionContainer}>
-        <Text>No access to camera</Text>
-        <TouchableOpacity
-          style={styles.button}
-          onPress={() => setShowBarcodeInput(true)}
-        >
-          <Text style={styles.buttonText}>Enter Barcode Manually</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  const scanningActive = !scanned && !showBarcodeInput;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
       <KeyboardAvoidingView
         style={styles.keyboardAvoidingContainer}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={100}
       >
         {!scanned ? (
           <View style={styles.scanContainer}>
-            <Text style={styles.scanHeaderText}>Scan Product Barcode</Text>
+            <Text style={styles.scanHint}>Point the camera at the product barcode</Text>
 
-            <CameraView
-              style={styles.camera}
-              facing="back"
-              barcodeScannerSettings={{
-                barcodeTypes: [
-                  "qr", "ean13", "ean8", "upc_e", "code39",
-                  "code128", "itf14", "codabar", "upc_a"
-                ],
-              }}
-              onBarcodeScanned={handleBarCodeScanned}
-            />
-
-            <View style={styles.scanButtonsContainer}>
-              <TouchableOpacity
-                style={styles.alternateButton}
-                onPress={() => {
-                  setShowBarcodeInput(true)
-                  handleBarCodeScanned
-                  setScanned(true)
-                }
-                  
-                }
-              >
-                <Text style={styles.alternateButtonText}>Enter Barcode Manually</Text>
-              </TouchableOpacity>
+            <View style={styles.cameraFrame}>
+              {hasPermission ? (
+                <CameraView
+                  style={StyleSheet.absoluteFill}
+                  facing="back"
+                  active={scanningActive}
+                  barcodeScannerSettings={{
+                    barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e'],
+                  }}
+                  onBarcodeScanned={scanningActive ? handleBarCodeScanned : undefined}
+                />
+              ) : (
+                <View style={styles.noCamera}>
+                  <Ionicons name="camera-outline" size={40} color={theme.textSecondary} />
+                  <Text style={styles.permissionText}>Camera unavailable</Text>
+                </View>
+              )}
+              <View style={styles.reticle} pointerEvents="none" />
             </View>
+
+            <TouchableOpacity
+              style={[styles.manualButton, { marginBottom: Math.max(insets.bottom, 12) + 8 }]}
+              onPress={() => setShowBarcodeInput(true)}
+            >
+              <Ionicons name="keypad-outline" size={18} color={theme.primary} />
+              <Text style={styles.manualButtonText}>Enter barcode manually</Text>
+            </TouchableOpacity>
           </View>
         ) : (
-          <ScrollView style={styles.formContainer} contentContainerStyle={styles.formContent}>
+          <ScrollView
+            style={styles.formContainer}
+            contentContainerStyle={[styles.formContent, { paddingBottom: Math.max(insets.bottom, 16) + 24 }]}
+            keyboardShouldPersistTaps="handled"
+          >
             {scannedItem && (
               <>
                 <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionHeaderText}>Product Information</Text>
+                  <Text style={styles.sectionHeaderText}>Product information</Text>
                   <Text style={styles.barcodeText}>Barcode: {scannedItem.barcode}</Text>
                 </View>
 
                 {existingProduct && (
                   <View style={styles.existingProductBanner}>
-                    <Ionicons name="information-circle" size={20} color="#fff" />
-                    <Text style={styles.existingProductText}>
-                      Existing product - quantity will be added
-                    </Text>
+                    <Ionicons name="information-circle" size={20} color="#ffffff" />
+                    <Text style={styles.existingProductText}>Existing product — quantity will be added</Text>
                   </View>
                 )}
 
-                {/* Product Image */}
                 <View style={styles.imageSection}>
-                  <TouchableOpacity
-                    style={styles.imageButton}
-                    onPress={pickProductImage}
-                    onLongPress={captureProductImage}
-                  >
+                  <TouchableOpacity style={styles.imageButton} onPress={pickProductImage} onLongPress={captureProductImage}>
                     {productImage ? (
-                      <Image
-                        source={{ uri: productImage }}
-                        style={styles.productImage}
-                      />
+                      <Image source={{ uri: productImage }} style={styles.productImage} />
                     ) : (
                       <View style={styles.imagePlaceholder}>
-                        <FontAwesome5 name="camera" size={32} color={theme.textSecondary} />
-                        <Text style={styles.imagePlaceholderText}>
-                          {existingProduct ? 'Update Product Image' : 'Add Product Image'}
-                        </Text>
-                        <Text style={styles.imagePlaceholderText}>Tap to select an image</Text>
-                        <Text style={styles.imagePlaceholderText}>Hold to take a photo</Text>
+                        <FontAwesome5 name="camera" size={28} color={theme.textSecondary} />
+                        <Text style={styles.imagePlaceholderText}>{existingProduct ? 'Update image' : 'Add image'}</Text>
+                        <Text style={styles.imagePlaceholderHint}>Tap to choose · hold to shoot</Text>
                       </View>
                     )}
                   </TouchableOpacity>
                 </View>
 
-                {/* Product Details Form */}
                 <View style={styles.formGroup}>
-                  <Text style={styles.label}>Product Name *</Text>
+                  <Text style={styles.label}>Product name *</Text>
                   <TextInput
                     style={styles.input}
                     value={itemName}
@@ -562,7 +494,7 @@ const AddItemScreen: React.FC<AddItemScreenProps> = ({ navigation }) => {
 
                 <View style={styles.row}>
                   <View style={[styles.formGroup, styles.halfWidth]}>
-                    <Text style={styles.label}>Price *</Text>
+                    <Text style={styles.label}>Price (Rs.) *</Text>
                     <TextInput
                       style={styles.input}
                       value={price}
@@ -572,7 +504,6 @@ const AddItemScreen: React.FC<AddItemScreenProps> = ({ navigation }) => {
                       placeholderTextColor={theme.placeholder}
                     />
                   </View>
-
                   <View style={[styles.formGroup, styles.halfWidth]}>
                     <Text style={styles.label}>Quantity *</Text>
                     <TextInput
@@ -590,19 +521,18 @@ const AddItemScreen: React.FC<AddItemScreenProps> = ({ navigation }) => {
                   <View style={styles.formGroup}>
                     <Text style={styles.label}>Category</Text>
                     <View style={styles.categoryContainer}>
-                      {categories.map(category => (
+                      {categories.map((category) => (
                         <TouchableOpacity
                           key={category}
-                          style={[
-                            styles.categoryButton,
-                            selectedCategory === category && styles.selectedCategoryButton
-                          ]}
+                          style={[styles.categoryButton, selectedCategory === category && styles.selectedCategoryButton]}
                           onPress={() => setSelectedCategory(category)}
                         >
-                          <Text style={[
-                            styles.categoryButtonText,
-                            selectedCategory === category && styles.selectedCategoryButtonText
-                          ]}>
+                          <Text
+                            style={[
+                              styles.categoryButtonText,
+                              selectedCategory === category && styles.selectedCategoryButtonText,
+                            ]}
+                          >
                             {category}
                           </Text>
                         </TouchableOpacity>
@@ -612,24 +542,14 @@ const AddItemScreen: React.FC<AddItemScreenProps> = ({ navigation }) => {
                 )}
 
                 <View style={styles.buttonGroup}>
-                  <TouchableOpacity
-                    style={styles.secondaryButton}
-                    onPress={resetForm}
-                  >
-                    <Text style={styles.secondaryButtonText}>Cancel</Text>
+                  <TouchableOpacity style={styles.secondaryButton} onPress={resetForm}>
+                    <Text style={styles.secondaryButtonText}>Scan again</Text>
                   </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.primaryButton}
-                    onPress={addItemToInventory}
-                    disabled={loading}
-                  >
+                  <TouchableOpacity style={styles.primaryButton} onPress={addItemToInventory} disabled={loading}>
                     {loading ? (
                       <ActivityIndicator color="#fff" />
                     ) : (
-                      <Text style={styles.primaryButtonText}>
-                        {existingProduct ? 'Update Inventory' : 'Add to Inventory'}
-                      </Text>
+                      <Text style={styles.primaryButtonText}>{existingProduct ? 'Update inventory' : 'Add to inventory'}</Text>
                     )}
                   </TouchableOpacity>
                 </View>
@@ -639,13 +559,14 @@ const AddItemScreen: React.FC<AddItemScreenProps> = ({ navigation }) => {
         )}
       </KeyboardAvoidingView>
 
-      {/* Manual Barcode Input Modal */}
       <BarcodeInputModal
         visible={showBarcodeInput}
         onClose={() => setShowBarcodeInput(false)}
         onSubmit={(barcode) => {
           setShowBarcodeInput(false);
-          processScannedBarcode(barcode);
+          setScanned(true);
+          processingRef.current = true;
+          void processScannedBarcode(barcode);
         }}
         theme={theme}
       />
@@ -653,198 +574,127 @@ const AddItemScreen: React.FC<AddItemScreenProps> = ({ navigation }) => {
   );
 };
 
-const createStyles = (theme: any) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.background,
-  },
-  permissionContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  keyboardAvoidingContainer: {
-    flex: 1,
-  },
-  scanContainer: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  scanHeaderText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 20,
-    color: theme.text,
-  },
-  camera: {
-    flex: 1,
-    marginHorizontal: 20,
-    borderRadius: 10,
-    overflow: 'hidden',
-  },
-  scanButtonsContainer: {
-    padding: 20,
-    alignItems: 'center',
-  },
-  alternateButton: {
-    padding: 15,
-    borderRadius: 8,
-    backgroundColor: theme.cardBackground,
-  },
-  alternateButtonText: {
-    color: theme.primary,
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  formContainer: {
-    flex: 1,
-  },
-  formContent: {
-    padding: 20,
-  },
-  sectionHeader: {
-    marginBottom: 20,
-  },
-  sectionHeaderText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: theme.text,
-  },
-  barcodeText: {
-    fontSize: 14,
-    color: theme.textSecondary,
-    marginTop: 5,
-  },
-  existingProductBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFA000',
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 20,
-  },
-  existingProductText: {
-    color: '#fff',
-    marginLeft: 10,
-    fontSize: 14,
-  },
-  imageSection: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  imageButton: {
-    width: 200,
-    height: 200,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: theme.cardBackground,
-    borderRadius: 10,
-    overflow: 'hidden',
-  },
-  productImage: {
-    width: '100%',
-    height: '100%',
-  },
-  imagePlaceholder: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  imagePlaceholderText: {
-    marginTop: 10,
-    color: theme.textSecondary,
-    textAlign: 'center',
-  },
-  formGroup: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginBottom: 8,
-    color: theme.text,
-  },
-  input: {
-    backgroundColor: theme.cardBackground,
-    padding: 15,
-    borderRadius: 8,
-    fontSize: 16,
-    color: theme.text,
-  },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  halfWidth: {
-    width: '48%',
-  },
-  categoryContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: 10,
-  },
-  categoryButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 15,
-    borderRadius: 20,
-    backgroundColor: theme.cardBackground,
-    marginRight: 10,
-    marginBottom: 10,
-  },
-  selectedCategoryButton: {
-    backgroundColor: theme.primary,
-  },
-  categoryButtonText: {
-    color: theme.text,
-  },
-  selectedCategoryButtonText: {
-    color: '#fff',
-  },
-  buttonGroup: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 30,
-  },
-  primaryButton: {
-    flex: 1,
-    backgroundColor: theme.primary,
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginLeft: 10,
-  },
-  primaryButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  secondaryButton: {
-    flex: 1,
-    backgroundColor: theme.cardBackground,
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  secondaryButtonText: {
-    color: theme.text,
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  button: {
-    backgroundColor: theme.primary,
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-});
+const createStyles = (theme: Theme) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: theme.background },
+    permissionContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 20,
+      backgroundColor: theme.background,
+    },
+    permissionText: { color: theme.textSecondary, marginTop: 12, fontSize: 15 },
+    keyboardAvoidingContainer: { flex: 1 },
+    scanContainer: { flex: 1, alignItems: 'center', paddingTop: 24, paddingHorizontal: 20 },
+    scanHint: { color: theme.textSecondary, fontSize: 14, marginBottom: 16, textAlign: 'center' },
+    cameraFrame: {
+      width: '86%',
+      aspectRatio: 1,
+      maxWidth: 320,
+      borderRadius: 18,
+      overflow: 'hidden',
+      backgroundColor: '#000000',
+    },
+    noCamera: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
+    reticle: {
+      position: 'absolute',
+      top: '18%',
+      left: '12%',
+      right: '12%',
+      bottom: '18%',
+      borderWidth: 2,
+      borderColor: 'rgba(255,255,255,0.85)',
+      borderRadius: 12,
+    },
+    manualButton: {
+      marginTop: 'auto',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingVertical: 14,
+      paddingHorizontal: 20,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: theme.divider,
+      backgroundColor: theme.cardBackground,
+    },
+    manualButtonText: { color: theme.primary, fontSize: 15, fontWeight: '800' },
+    formContainer: { flex: 1 },
+    formContent: { padding: 20 },
+    sectionHeader: { marginBottom: 18 },
+    sectionHeaderText: { fontSize: 17, fontWeight: 'bold', color: theme.text },
+    barcodeText: { fontSize: 14, color: theme.textSecondary, marginTop: 4 },
+    existingProductBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: theme.mode === 'dark' ? '#78350f' : '#f59e0b',
+      padding: 10,
+      borderRadius: 8,
+      marginBottom: 18,
+      gap: 8,
+    },
+    existingProductText: { color: '#ffffff', fontSize: 13, flex: 1 },
+    imageSection: { alignItems: 'center', marginBottom: 20 },
+    imageButton: {
+      width: 160,
+      height: 160,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: theme.cardBackground,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.divider,
+      overflow: 'hidden',
+    },
+    productImage: { width: '100%', height: '100%' },
+    imagePlaceholder: { justifyContent: 'center', alignItems: 'center', padding: 16 },
+    imagePlaceholderText: { marginTop: 10, color: theme.text, fontWeight: '700', textAlign: 'center' },
+    imagePlaceholderHint: { marginTop: 4, color: theme.textSecondary, fontSize: 12, textAlign: 'center' },
+    formGroup: { marginBottom: 18 },
+    label: { fontSize: 14, fontWeight: 'bold', marginBottom: 8, color: theme.text },
+    input: {
+      backgroundColor: theme.cardBackground,
+      padding: 14,
+      borderRadius: 8,
+      fontSize: 16,
+      color: theme.text,
+      borderWidth: 1,
+      borderColor: theme.divider,
+    },
+    row: { flexDirection: 'row', justifyContent: 'space-between' },
+    halfWidth: { width: '48%' },
+    categoryContainer: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 4, gap: 8 },
+    categoryButton: {
+      paddingVertical: 8,
+      paddingHorizontal: 14,
+      borderRadius: 20,
+      backgroundColor: theme.cardBackground,
+      borderWidth: 1,
+      borderColor: theme.divider,
+    },
+    selectedCategoryButton: { backgroundColor: theme.primary, borderColor: theme.primary },
+    categoryButtonText: { color: theme.text },
+    selectedCategoryButtonText: { color: '#ffffff' },
+    buttonGroup: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 24, gap: 12 },
+    primaryButton: {
+      flex: 1,
+      backgroundColor: theme.primary,
+      padding: 15,
+      borderRadius: 10,
+      alignItems: 'center',
+    },
+    primaryButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+    secondaryButton: {
+      flex: 1,
+      backgroundColor: theme.cardBackground,
+      padding: 15,
+      borderRadius: 10,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: theme.divider,
+    },
+    secondaryButtonText: { color: theme.text, fontSize: 16, fontWeight: 'bold' },
+  });
 
 export default AddItemScreen;

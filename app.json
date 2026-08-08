@@ -1,0 +1,74 @@
+{
+  "expo": {
+    "name": "MOPX",
+    "slug": "mob-app",
+    "version": "2.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash-light.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#f4f6fa",
+      "dark": {
+        "image": "./assets/splash-dark.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#0f1116"
+      }
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.arpanpatra.mopx"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.arpanpatra.mopx"
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow MOPX to scan product barcodes."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow MOPX to attach product photos.",
+          "cameraPermission": "Allow MOPX to take product photos."
+        }
+      ],
+      [
+        "expo-navigation-bar",
+        {
+          "enforceContrast": false
+        }
+      ],
+      "expo-sharing",
+      "expo-updates",
+      "@react-native-community/datetimepicker",
+      "expo-sqlite",
+      "expo-asset"
+    ],
+    "updates": {
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/17cfda77-984c-4ef0-aa9b-5834145c986e"
+    },
+    "runtimeVersion": "2.0.0",
+    "extra": {
+      "appVariant": "production",
+      "expo-navigation-bar": {
+        "enforceContrast": false
+      },
+      "eas": {
+        "projectId": "17cfda77-984c-4ef0-aa9b-5834145c986e"
+      }
+    },
+    "owner": "arpan111"
+  }
+}
