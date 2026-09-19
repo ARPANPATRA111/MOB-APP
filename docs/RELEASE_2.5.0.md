@@ -122,11 +122,11 @@ SAFE
 | File | Size | Use |
 |------|------|-----|
 | `feature-graphic-1024x500.png` | 1024 × 500 | Feature graphic |
-| `phone-01-home-1080x1920.png` | 1080 × 1920 | Phone screenshot 1 |
-| `phone-02-bill-1080x1920.png` | 1080 × 1920 | Phone screenshot 2 |
-| `phone-03-find-1080x1920.png` | 1080 × 1920 | Phone screenshot 3 |
-| `phone-04-stock-1080x1920.png` | 1080 × 1920 | Phone screenshot 4 |
-| `phone-05-receipt-1080x1920.png` | 1080 × 1920 | Phone screenshot 5 |
-| `phone-06-reports-1080x1920.png` | 1080 × 1920 | Phone screenshot 6 |
+| `phone-01-home-1440x2560.png` | 1440 × 2560 | Phone screenshot 1 |
+| `phone-02-bill-1440x2560.png` | 1440 × 2560 | Phone screenshot 2 |
+| `phone-03-find-1440x2560.png` | 1440 × 2560 | Phone screenshot 3 |
+| `phone-04-stock-1440x2560.png` | 1440 × 2560 | Phone screenshot 4 |
+| `phone-05-receipt-1440x2560.png` | 1440 × 2560 | Phone screenshot 5 |
+| `phone-06-reports-1440x2560.png` | 1440 × 2560 | Phone screenshot 6 |
 
-Play accepts 2–8 phone screenshots, PNG/JPEG, 320–3840 px on each side, 16:9 or 9:16. The set above is the current 2.5 design captured on an API 36 emulator and framed by `scripts/play-graphics.py` (`python scripts/play-graphics.py <dir with home/bill/find/stock/receipt/reports.png> docs/play-store/2.5.0`), so the next release can regenerate them from fresh screenshots in a minute.
+Play accepts 2–8 phone screenshots, PNG/JPEG, 320–3840 px on each side; 9:16 at 1080 px or more makes the listing eligible for the larger promotional layout. The screens were captured at 1440 × 3120 / 560 dpi (a current flagship panel: `adb shell wm size 1440x3120`, `wm density 560`, SystemUI demo mode for a clean 10:00 status bar) and framed in a flat-edge, thin-bezel, punch-hole device by `scripts/play-graphics.py`, rendered at 2× and downsampled. Regenerate for the next release with `python scripts/play-graphics.py <dir with home/bill/find/stock/receipt/reports.png> docs/play-store/2.5.0`.
