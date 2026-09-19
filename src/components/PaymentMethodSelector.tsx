@@ -1,5 +1,6 @@
+import { AppText as Text } from '../contexts/TypographyContext';
 import React from 'react';
-import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import { Theme } from '../contexts/ThemeContext';
 
 interface PaymentMethodSelectorProps {

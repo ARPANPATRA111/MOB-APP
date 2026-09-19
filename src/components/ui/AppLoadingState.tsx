@@ -1,5 +1,6 @@
+import { AppText as Text } from '../../contexts/TypographyContext';
 import React from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { Theme } from '../../contexts/ThemeContext';
 
 /**

@@ -92,14 +92,26 @@ android {
         applicationId 'com.arpanpatra.mopx'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        // Baseline only. eas.json uses appVersionSource "remote", so EAS owns the
-        // real build number and injects it at build time — do not bump by hand.
-        versionCode 2
-        versionName "2.0.0"
+        // Increment for each locally distributed APK.
+        versionCode 11
+        versionName "2.4.2"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }
     signingConfigs {
+        release {
+            // EAS injects signing credentials in cloud builds. Local release checks use
+            // the same ignored credentials file; passwords never enter source control.
+            def credentialsFile = rootProject.file('../credentials.json')
+            if (credentialsFile.exists()) {
+                def credentials = new groovy.json.JsonSlurper().parse(credentialsFile).android.keystore
+                def path = new File(credentials.keystorePath)
+                storeFile path.isAbsolute() ? path : rootProject.file('../' + credentials.keystorePath)
+                storePassword credentials.keystorePassword
+                keyAlias credentials.keyAlias
+                keyPassword credentials.keyPassword ?: credentials.keystorePassword
+            }
+        }
         debug {
             storeFile file('debug.keystore')
             storePassword 'android'
@@ -112,9 +124,7 @@ android {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()
             minifyEnabled enableMinifyInReleaseBuilds
@@ -180,5 +190,22 @@ dependencies {
         implementation("com.facebook.react:hermes-android")
     } else {
         implementation jscFlavor
+    }
+}
+
+// expo-updates' create*UpdatesResources task declares no JS/asset inputs, so Gradle
+// happily reuses a stale app.manifest across builds. A stale manifest silently drops
+// newer assets (fonts, sounds) from the embedded asset map and they fail to load at
+// runtime in release. Always regenerate it.
+tasks.matching { it.name ==~ /create\w*UpdatesResources/ }.configureEach {
+    outputs.upToDateWhen { false }
+}
+
+// Fail clearly instead of accidentally producing a debug-signed release.
+tasks.matching { it.name == 'validateSigningRelease' }.configureEach {
+    doFirst {
+        if (android.signingConfigs.release.storeFile == null) {
+            throw new GradleException('Release credentials are required. Configure credentials.json or use EAS Build.')
+        }
     }
 }

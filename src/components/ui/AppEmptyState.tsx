@@ -1,5 +1,6 @@
+import { AppText as Text } from '../../contexts/TypographyContext';
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Theme } from '../../contexts/ThemeContext';
 
 const AppEmptyState: React.FC<{ theme: Theme; title: string; message?: string }> = ({ theme, title, message }) => (

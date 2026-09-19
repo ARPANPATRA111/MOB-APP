@@ -2,18 +2,18 @@
   "expo": {
     "name": "MOPX",
     "slug": "mob-app",
-    "version": "2.0.0",
+    "version": "2.4.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/splash-light.png",
       "resizeMode": "contain",
-      "backgroundColor": "#f4f6fa",
+      "backgroundColor": "#f2f2f7",
       "dark": {
         "image": "./assets/splash-dark.png",
         "resizeMode": "contain",
-        "backgroundColor": "#0f1116"
+        "backgroundColor": "#000000"
       }
     },
     "ios": {
@@ -25,20 +25,29 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.arpanpatra.mopx"
+      "package": "com.arpanpatra.mopx",
+      "allowBackup": false,
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ]
     },
     "plugins": [
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow MOPX to scan product barcodes."
+          "cameraPermission": "Allow MOPX to scan product barcodes.",
+          "recordAudioAndroid": false
         }
       ],
       [
         "expo-image-picker",
         {
           "photosPermission": "Allow MOPX to attach product photos.",
-          "cameraPermission": "Allow MOPX to take product photos."
+          "cameraPermission": "Allow MOPX to take product photos.",
+          "microphonePermission": false
         }
       ],
       [
@@ -51,7 +60,27 @@
       "expo-updates",
       "@react-native-community/datetimepicker",
       "expo-sqlite",
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ],
+      "expo-notifications",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#f2f2f7",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 288,
+          "dark": {
+            "backgroundColor": "#000000",
+            "image": "./assets/splash-icon.png"
+          }
+        }
+      ]
     ],
     "updates": {
       "enabled": true,
@@ -59,7 +88,7 @@
       "fallbackToCacheTimeout": 0,
       "url": "https://u.expo.dev/17cfda77-984c-4ef0-aa9b-5834145c986e"
     },
-    "runtimeVersion": "2.0.0",
+    "runtimeVersion": "2.4.2",
     "extra": {
       "appVariant": "production",
       "expo-navigation-bar": {

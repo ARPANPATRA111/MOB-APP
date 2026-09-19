@@ -1,6 +1,7 @@
+import { AppText as Text } from '../../contexts/TypographyContext';
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Theme } from '../../contexts/ThemeContext';
 import { typography } from '../../theme/typography';
 

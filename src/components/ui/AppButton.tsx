@@ -1,5 +1,7 @@
+import { AppText as Text } from '../../contexts/TypographyContext';
 import React from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, ViewStyle } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View, ViewStyle } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Theme } from '../../contexts/ThemeContext';
 import { typography } from '../../theme/typography';
 
@@ -7,65 +9,107 @@ interface Props {
   label: string;
   onPress: () => void;
   theme: Theme;
-  variant?: 'primary' | 'secondary' | 'danger';
+  /** iOS button styles: filled (primary), tinted (secondary), text-only (plain), destructive. */
+  variant?: 'primary' | 'secondary' | 'plain' | 'danger';
   disabled?: boolean;
   loading?: boolean;
   style?: ViewStyle;
+  icon?: React.ComponentProps<typeof Ionicons>['name'];
+  compact?: boolean;
+  /**
+   * Called when the button is tapped while `disabled`. Lets a form explain why
+   * it cannot proceed ("fill Name and Price") instead of ignoring the tap.
+   */
+  onDisabledPress?: () => void;
 }
 
-/**
- * Label/spinner colour per variant. `onPrimary` is theme-aware because the dark
- * theme's primary is a light blue — white text on it fails contrast, dark text
- * passes.
- */
 const foregroundFor = (theme: Theme, variant: NonNullable<Props['variant']>) => {
-  if (variant === 'secondary') {
-    return theme.primary;
-  }
+  if (variant === 'secondary' || variant === 'plain') return theme.primary;
   return variant === 'danger' ? '#ffffff' : theme.onPrimary;
 };
 
-const AppButton: React.FC<Props> = ({ label, onPress, theme, variant = 'primary', disabled, loading, style }) => {
-  const styles = createStyles(theme, variant);
+const backgroundFor = (theme: Theme, variant: NonNullable<Props['variant']>) => {
+  switch (variant) {
+    case 'secondary':
+      return theme.primarySoft;
+    case 'plain':
+      return 'transparent';
+    case 'danger':
+      return theme.dangerStrong;
+    default:
+      return theme.primary;
+  }
+};
+
+/**
+ * Disabled filled buttons keep their hue at reduced alpha — a light blue "Save"
+ * reads as "not yet" while staying recognisable — rather than turning grey.
+ */
+const DISABLED_ALPHA = '4d'; // ≈ 30 %
+const disabledBackgroundFor = (theme: Theme, variant: NonNullable<Props['variant']>) => {
+  const base = backgroundFor(theme, variant);
+  return variant === 'secondary' || variant === 'plain' ? base : `${base}${DISABLED_ALPHA}`;
+};
+
+const AppButton: React.FC<Props> = ({
+  label,
+  onPress,
+  theme,
+  variant = 'primary',
+  disabled,
+  loading,
+  style,
+  icon,
+  compact,
+  onDisabledPress,
+}) => {
+  const fg = foregroundFor(theme, variant);
+  const inactive = disabled || loading;
+  // A disabled button that can explain itself stays tappable; a loading one never is.
+  const explains = Boolean(disabled && !loading && onDisabledPress);
   return (
-    <TouchableOpacity
-      style={[styles.button, (disabled || loading) && styles.disabled, style]}
-      onPress={onPress}
-      disabled={disabled || loading}
-      activeOpacity={0.82}
+    <Pressable
+      style={({ pressed }) => [
+        styles.button,
+        compact && styles.compact,
+        { backgroundColor: backgroundFor(theme, variant), opacity: pressed ? 0.7 : 1 },
+        disabled && !loading && { backgroundColor: disabledBackgroundFor(theme, variant) },
+        disabled && !loading && (variant === 'secondary' || variant === 'plain') && { opacity: 0.4 },
+        style,
+      ]}
+      onPress={explains ? onDisabledPress : onPress}
+      disabled={inactive && !explains}
       accessibilityRole="button"
       accessibilityLabel={label}
-      accessibilityState={{ disabled: Boolean(disabled || loading), busy: Boolean(loading) }}
+      accessibilityState={{ disabled: Boolean(inactive), busy: Boolean(loading) }}
     >
       {loading ? (
-        <ActivityIndicator color={foregroundFor(theme, variant)} />
+        <ActivityIndicator color={variant === 'plain' || variant === 'secondary' ? theme.primary : fg} />
       ) : (
-        <Text style={styles.label} numberOfLines={1}>{label}</Text>
+        <View style={styles.content}>
+          {icon && <Ionicons name={icon} size={compact ? 16 : 18} color={fg} />}
+          <Text style={[styles.label, compact && styles.compactLabel, { color: fg }]} numberOfLines={1}>
+            {label}
+          </Text>
+        </View>
       )}
-    </TouchableOpacity>
+    </Pressable>
   );
 };
 
-const createStyles = (theme: Theme, variant: NonNullable<Props['variant']>) => StyleSheet.create({
+const styles = StyleSheet.create({
   button: {
-    minHeight: 50,
+    minHeight: 46,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: variant === 'danger' ? theme.dangerStrong : variant === 'secondary' ? theme.cardBackground : theme.primary,
-    borderWidth: variant === 'secondary' ? 1 : 0,
-    borderColor: theme.primary,
+    paddingVertical: 10,
   },
-  disabled: {
-    backgroundColor: theme.disabled,
-    borderColor: theme.disabled,
-  },
-  label: {
-    color: foregroundFor(theme, variant),
-    ...typography.button,
-  },
+  compact: { minHeight: 36, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 },
+  content: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  label: { ...typography.button },
+  compactLabel: { fontSize: 13, lineHeight: 18 },
 });
 
 export default AppButton;

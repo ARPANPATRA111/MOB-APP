@@ -1,5 +1,6 @@
+import { AppText as Text } from '../../contexts/TypographyContext';
 import React from 'react';
-import { DimensionValue, StyleSheet, Text, View } from 'react-native';
+import { DimensionValue, StyleSheet, View } from 'react-native';
 import { Theme } from '../../contexts/ThemeContext';
 import { typography } from '../../theme/typography';
 

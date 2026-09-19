@@ -1,7 +1,7 @@
+import { AppText as Text } from '../contexts/TypographyContext';
 import React, { useState } from 'react';
 import {
   View,
-  Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
@@ -9,7 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { FontAwesome5 } from '@expo/vector-icons';
+import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import { Theme } from '../../src/contexts/ThemeContext';
 
 interface BarcodeInputModalProps {

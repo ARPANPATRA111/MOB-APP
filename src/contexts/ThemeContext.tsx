@@ -9,7 +9,6 @@ import React, {
 } from 'react';
 import { ColorSchemeName, useColorScheme } from 'react-native';
 import { storageService } from '../services/storage';
-
 // First define the interface
 export interface Theme {
   mode: 'light' | 'dark';
@@ -26,7 +25,6 @@ export interface Theme {
   headerBackground: string;
   headerText: string;
   divider: string;
-
   /**
    * App chrome — the single background shared by the navigation header, the
    * bottom action bar and the OS status/navigation bar areas. Keeping these on
@@ -42,7 +40,6 @@ export interface Theme {
   onPrimary: string;
   /** Slightly raised surface used for hero/metric panels above `cardBackground`. */
   surfaceElevated: string;
-
   // Theme-aware status colours. The flat values in `theme/colors.ts` are tuned
   // for light backgrounds only and wash out badly on the dark canvas.
   success: string;
@@ -57,82 +54,73 @@ export interface Theme {
    * WCAG AA against it in both themes.
    */
   dangerStrong: string;
-
   /** Baseline/gridline colour for in-app charts. */
   chartGrid: string;
   /** Fill for non-highlighted chart bars. */
   chartBarMuted: string;
 }
-
 // Then create the theme objects with proper typing
 export const lightTheme: Theme = {
   mode: 'light',
-  divider: '#e3e8ef', // for light theme
   statusBarStyle: 'dark-content',
-  background: '#f4f6fa',
+  // iOS system grouped palette. Canvas is the grouped background; cards are white.
+  background: '#f2f2f7',
   cardBackground: '#ffffff',
-  inputBackground: '#eef1f6',
-  text: '#111827',
-  textSecondary: '#5b6472',
-  placeholder: '#9aa3b2',
-  primary: '#2563eb',
-  secondary: '#64748b',
-  disabled: '#d7dde6',
-  headerBackground: '#f4f6fa',
-  headerText: '#111827',
-
-  chrome: '#f4f6fa',
-  chromeBorder: '#e3e8ef',
-  primarySoft: '#e6edfd',
+  inputBackground: '#eeeef2',
+  text: '#0b0b0f',
+  textSecondary: '#6e6e73',
+  placeholder: '#a1a1a8',
+  primary: '#0a7aff',
+  secondary: '#6e6e73',
+  disabled: '#c7c7cc',
+  headerBackground: '#f2f2f7',
+  headerText: '#0b0b0f',
+  divider: '#d8d8dd',
+  chrome: '#f7f7fa',
+  chromeBorder: '#d8d8dd',
+  primarySoft: '#e3efff',
   onPrimary: '#ffffff',
   surfaceElevated: '#ffffff',
-
-  success: '#15803d',
-  successSoft: '#dcfce7',
-  warning: '#b45309',
-  warningSoft: '#fef3c7',
-  danger: '#dc2626',
-  dangerSoft: '#fee2e2',
-  dangerStrong: '#dc2626',
-
-  chartGrid: '#e3e8ef',
-  chartBarMuted: '#cbd9f6',
+  success: '#248a3d',
+  successSoft: '#e1f5e6',
+  warning: '#c25e00',
+  warningSoft: '#fff1dd',
+  danger: '#d70015',
+  dangerSoft: '#ffe5e5',
+  dangerStrong: '#e5393f',
+  chartGrid: '#e3e3e8',
+  chartBarMuted: '#c9def7',
 };
-
 export const darkTheme: Theme = {
   mode: 'dark',
-  divider: '#272e3a',
   statusBarStyle: 'light-content',
-  background: '#0f1116',
-  cardBackground: '#181b22',
-  inputBackground: '#212633',
-  text: '#f2f5f9',
-  textSecondary: '#9aa4b5',
-  placeholder: '#6b7484',
-  primary: '#60a5fa',
-  secondary: '#4f5b66',
-  disabled: '#2a303a',
-  headerBackground: '#0f1116',
-  headerText: '#f2f5f9',
-
-  chrome: '#0f1116',
-  chromeBorder: '#272e3a',
-  primarySoft: '#1a2740',
-  onPrimary: '#0b1220',
-  surfaceElevated: '#1d212a',
-
-  success: '#4ade80',
+  background: '#000000',
+  cardBackground: '#1c1c1e',
+  inputBackground: '#2c2c2e',
+  text: '#f5f5f7',
+  textSecondary: '#98989f',
+  placeholder: '#6b6b70',
+  primary: '#3d9bff',
+  secondary: '#98989f',
+  disabled: '#3a3a3c',
+  headerBackground: '#000000',
+  headerText: '#f5f5f7',
+  divider: '#2f2f33',
+  chrome: '#121214',
+  chromeBorder: '#2a2a2e',
+  primarySoft: '#122a4a',
+  onPrimary: '#ffffff',
+  surfaceElevated: '#2c2c2e',
+  success: '#30d158',
   successSoft: '#12291d',
-  warning: '#fbbf24',
+  warning: '#ff9f0a',
   warningSoft: '#2d2413',
-  danger: '#f87171',
+  danger: '#ff453a',
   dangerSoft: '#2f1a1a',
-  dangerStrong: '#b91c1c',
-
-  chartGrid: '#272e3a',
-  chartBarMuted: '#26344f',
+  dangerStrong: '#d32f2f',
+  chartGrid: '#2a2a2e',
+  chartBarMuted: '#233a5c',
 };
-
 /**
  * Theme preference model:
  * - `system`: follow the device colour scheme (default).
@@ -140,7 +128,6 @@ export const darkTheme: Theme = {
  * The user can always return to `system`.
  */
 export type ThemeMode = 'system' | 'light' | 'dark';
-
 type ThemeContextType = {
   /** Resolved theme (mode is always 'light' | 'dark'). */
   theme: Theme;
@@ -155,7 +142,6 @@ type ThemeContextType = {
   /** Set the explicit preference (system | light | dark) and persist it. */
   setThemeMode: (mode: ThemeMode) => void;
 };
-
 const ThemeContext = createContext<ThemeContextType>({
   theme: lightTheme,
   themeMode: 'system',
@@ -164,7 +150,6 @@ const ThemeContext = createContext<ThemeContextType>({
   setTheme: () => {},
   setThemeMode: () => {},
 });
-
 export const resolveTheme = (
   mode: ThemeMode,
   systemScheme: ColorSchemeName
@@ -172,7 +157,6 @@ export const resolveTheme = (
   const effective = mode === 'system' ? systemScheme : mode;
   return effective === 'dark' ? darkTheme : lightTheme;
 };
-
 /** Normalise any persisted value (including legacy null) into a ThemeMode. */
 export const normalizeThemeMode = (stored: string | null | undefined): ThemeMode => {
   if (stored === 'light' || stored === 'dark' || stored === 'system') {
@@ -180,15 +164,12 @@ export const normalizeThemeMode = (stored: string | null | undefined): ThemeMode
   }
   return 'system';
 };
-
 export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   const systemScheme = useColorScheme();
   const [themeMode, setThemeModeState] = useState<ThemeMode>('system');
   const [isReady, setIsReady] = useState(false);
-
   useEffect(() => {
     let isMounted = true;
-
     const loadStoredTheme = async () => {
       try {
         const stored = await storageService.getThemePreference();
@@ -202,28 +183,22 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
         }
       }
     };
-
-    void loadStoredTheme();
-
+    void loadStoredTheme().catch(() => {});
     return () => {
       isMounted = false;
     };
   }, []);
-
   const theme = useMemo(
     () => resolveTheme(themeMode, systemScheme),
     [themeMode, systemScheme]
   );
-
   const setThemeMode = useCallback((mode: ThemeMode) => {
     setThemeModeState(mode);
-    void storageService.saveThemePreference(mode);
+    void storageService.saveThemePreference(mode).catch(() => {});
   }, []);
-
   const toggleTheme = useCallback(() => {
     setThemeMode(theme.mode === 'light' ? 'dark' : 'light');
   }, [setThemeMode, theme.mode]);
-
   const value = useMemo<ThemeContextType>(
     () => ({
       theme,
@@ -235,8 +210,6 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     }),
     [theme, themeMode, isReady, toggleTheme, setThemeMode]
   );
-
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 };
-
 export const useTheme = () => useContext(ThemeContext);

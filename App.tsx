@@ -1,45 +1,88 @@
-// App.tsx
-
-import React, { useEffect, useState } from 'react';
+import { useFonts } from "expo-font";
+import { Inter_400Regular } from "@expo-google-fonts/inter/400Regular";
+import { Inter_500Medium } from "@expo-google-fonts/inter/500Medium";
+import { Inter_600SemiBold } from "@expo-google-fonts/inter/600SemiBold";
+import { Inter_700Bold } from "@expo-google-fonts/inter/700Bold";
+import { PlusJakartaSans_600SemiBold } from "@expo-google-fonts/plus-jakarta-sans/600SemiBold";
+import { PlusJakartaSans_700Bold } from "@expo-google-fonts/plus-jakarta-sans/700Bold";
+import { PlusJakartaSans_800ExtraBold } from "@expo-google-fonts/plus-jakarta-sans/800ExtraBold";
+import * as SplashScreen from "expo-splash-screen";
+import { KeyboardProvider } from "react-native-keyboard-controller";
+import { TypographyProvider } from "./src/contexts/TypographyContext";
+import ProductPickerScreen from "./screens/ProductPickerScreen";
+import BusinessDetailsScreen from "./screens/BusinessDetailsScreen";
+import SetupScreen from "./screens/SetupScreen";
+import { getBusinessProfile } from "./src/repositories/settingsRepository";
+import { getDatabase } from "./src/db/database";
+import { checkForUpdates } from "./src/services/updateCheck";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   NavigationContainer,
   DarkTheme,
   DefaultTheme,
+  useNavigationContainerRef,
   type CompositeNavigationProp,
   type NavigatorScreenParams,
-} from '@react-navigation/native';
-import { createStackNavigator, type StackNavigationProp } from '@react-navigation/stack';
+} from "@react-navigation/native";
+import {
+  createNativeStackNavigator,
+  type NativeStackNavigationProp,
+} from "@react-navigation/native-stack";
 import {
   createBottomTabNavigator,
   type BottomTabNavigationProp,
-} from '@react-navigation/bottom-tabs';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { Platform, StatusBar, View } from 'react-native';
-import * as NavigationBar from 'expo-navigation-bar';
-import * as SystemUI from 'expo-system-ui';
-import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
-import { CurrencyProvider } from './src/contexts/CurrencyContext';
-import { storageService } from './src/services/storage';
-import { billingSession } from './src/services/billingSession';
-import AppSplash from './src/components/ui/AppSplash';
-import AppTabBar, { ACTION_TAB_NAME } from './src/components/ui/AppTabBar';
-import { ToastProvider } from './src/components/ui/ToastProvider';
-import { DialogProvider } from './src/components/ui/DialogProvider';
-import ErrorBoundary from './ErrorBoundary';
-import DashboardScreen from './screens/DashboardScreen';
-import AddItemScreen from './screens/AddItemScreen';
-import InventoryScreen from './screens/InventoryScreen';
-import BillingScreen from './screens/BillingScreen';
-import BillReviewScreen from './screens/BillReviewScreen';
-import BillReceiptScreen from './screens/BillReceiptScreen';
-import AboutScreen from './screens/AboutScreen';
-import SettingsScreen from './screens/SettingsScreen';
-import ReportsScreen from './screens/ReportsScreen';
-import RecentActivityScreen from './screens/RecentActivityScreen';
-import NotificationsScreen from './screens/NotificationsScreen';
+} from "@react-navigation/bottom-tabs";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import { Platform, StatusBar, View } from "react-native";
+import * as NavigationBar from "expo-navigation-bar";
+import * as SystemUI from "expo-system-ui";
+import { ThemeProvider, useTheme } from "./src/contexts/ThemeContext";
+import { CurrencyProvider } from "./src/contexts/CurrencyContext";
+import { storageService } from "./src/services/storage";
+import AppTabBar from "./src/components/ui/AppTabBar";
+import StackHeader from "./src/components/ui/StackHeader";
+import TabHeader from "./src/components/ui/TabHeader";
+import AppButton from "./src/components/ui/AppButton";
+import { Copy, Notice, Panel } from "./src/components/ui/CommerceUI";
+import { ToastProvider } from "./src/components/ui/ToastProvider";
+import { DialogProvider } from "./src/components/ui/DialogProvider";
+import { useReducedMotion } from "./src/components/ui/Skeleton";
+import ExitHint from "./src/components/ui/ExitHint";
+import ErrorBoundary from "./ErrorBoundary";
+import DashboardScreen from "./screens/DashboardScreen";
+import AddItemScreen from "./screens/AddItemScreen";
+import InventoryScreen from "./screens/InventoryScreen";
+import BillingScreen from "./screens/BillingScreen";
+import BillReviewScreen from "./screens/BillReviewScreen";
+import BillReceiptScreen from "./screens/BillReceiptScreen";
+import AboutScreen from "./screens/AboutScreen";
+import SettingsScreen from "./screens/SettingsScreen";
+import ReportsScreen from "./screens/ReportsScreen";
+import RecentActivityScreen from "./screens/RecentActivityScreen";
+import NotificationsScreen from "./screens/NotificationsScreen";
+import ManagementScreen from "./screens/ManagementScreen";
+import ParkedBillsScreen from "./screens/ParkedBillsScreen";
+import PurchasesScreen from "./screens/PurchasesScreen";
+import SuppliersScreen from "./screens/SuppliersScreen";
+import CreditScreen from "./screens/CreditScreen";
+import StockHistoryScreen from "./screens/StockHistoryScreen";
+import ImportScreen from "./screens/ImportScreen";
+import BackupScreen from "./screens/BackupScreen";
+import PrinterScreen from "./screens/PrinterScreen";
+/**
+ * The native splash (a disc icon that fits Android's safe circle and reads on
+ * light and dark) is held on screen until fonts, theme and the database are
+ * ready and at least SPLASH_MIN_MS have passed since JS started, then fades.
+ * Keeping the native view instead of re-drawing it in JS avoids the size and
+ * position jump different Android skins would otherwise show. Resuming from
+ * background never shows it.
+ */
+void SplashScreen.preventAutoHideAsync().catch(() => {});
+SplashScreen.setOptions({ duration: 350, fade: true });
+const SPLASH_MIN_MS = 2000;
+const launchedAt = Date.now();
 
-/** The four daily destinations, plus the action-only slot for New Bill. */
 export type MainTabParamList = {
   Dashboard: undefined;
   Inventory: undefined;
@@ -47,231 +90,317 @@ export type MainTabParamList = {
   Reports: undefined;
   Settings: undefined;
 };
-
-/** Everything pushed *over* the tabs — task flows that own the whole screen. */
 export type RootStackParamList = {
   MainTabs: NavigatorScreenParams<MainTabParamList> | undefined;
-  AddItem: undefined;
+  AddItem: { productId?: string } | undefined;
   Billing: undefined;
   BillReview: undefined;
   BillReceipt: { billId: string };
   About: undefined;
-  RecentActivity: undefined;
+  RecentActivity:
+    { start?: number; end?: number; productId?: string } | undefined;
   Notifications: undefined;
+  Management: undefined;
+  BusinessDetails: undefined;
+  ProductPicker: undefined;
+  ParkedBills: undefined;
+  Purchases: undefined;
+  Suppliers: undefined;
+  Credit: { billId?: string } | undefined;
+  StockHistory: undefined;
+  Import: undefined;
+  Backup: undefined;
+  Printer: undefined;
 };
-
-/**
- * Navigation prop for screens hosted inside the tabs. They reach both their tab
- * siblings (`navigate('Inventory')`) and the parent stack (`navigate('AddItem')`).
- */
 export type AppNavigation = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList>,
-  StackNavigationProp<RootStackParamList>
+  NativeStackNavigationProp<RootStackParamList>
 >;
-
-const Stack = createStackNavigator<RootStackParamList, undefined>();
-const Tab = createBottomTabNavigator<MainTabParamList, undefined>();
-
-/** Placeholder for the action-only tab; the bar intercepts the press. */
+const Stack = createNativeStackNavigator<RootStackParamList>();
+const Tab = createBottomTabNavigator<MainTabParamList>();
 const NullScreen = () => null;
-
-const MainTabs = () => {
+function MainTabs() {
   const { theme } = useTheme();
-
   return (
     <Tab.Navigator
       id={undefined}
-      initialRouteName="Dashboard"
       backBehavior="initialRoute"
       screenOptions={{
-        headerStyle: {
-          elevation: 0,
-          shadowOpacity: 0,
-          backgroundColor: theme.chrome,
-        },
-        headerTintColor: theme.text,
-        headerTitleStyle: { fontWeight: '800', fontSize: 18, color: theme.text },
-        headerTitleAlign: 'left',
-        headerRightContainerStyle: { paddingRight: 12 },
-        headerShadowVisible: false,
+        header: (props) => <TabHeader {...props} />,
         sceneStyle: { backgroundColor: theme.background },
+        tabBarHideOnKeyboard: true,
       }}
       tabBar={(props) => (
         <AppTabBar
           {...props}
           theme={theme}
-          onAction={() => {
-            // Always start from a clean cart, from whichever tab is showing.
-            billingSession.clear();
-            props.navigation.navigate('Billing');
-          }}
+          onAction={() => props.navigation.navigate("Billing")}
         />
       )}
     >
-      <Tab.Screen name="Dashboard" component={DashboardScreen} options={{ headerShown: false }} />
-      <Tab.Screen name="Inventory" component={InventoryScreen} options={{ title: 'Inventory' }} />
-      <Tab.Screen name={ACTION_TAB_NAME} component={NullScreen} options={{ title: 'New Bill' }} />
-      <Tab.Screen name="Reports" component={ReportsScreen} options={{ title: 'Reports' }} />
-      <Tab.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />
+      <Tab.Screen
+        name="Dashboard"
+        component={DashboardScreen}
+        options={{ headerShown: false }}
+      />
+      <Tab.Screen
+        name="Inventory"
+        component={InventoryScreen}
+        options={{ title: "Stock" }}
+      />
+      <Tab.Screen name="NewBill" component={NullScreen} />
+      <Tab.Screen name="Reports" component={ReportsScreen} />
+      <Tab.Screen name="Settings" component={SettingsScreen} />
     </Tab.Navigator>
   );
-};
-
-const AppNavigator = () => {
+}
+function AppNavigator() {
   const { theme } = useTheme();
-  const navigationTheme = {
-    ...(theme.mode === 'dark' ? DarkTheme : DefaultTheme),
-    colors: {
-      ...(theme.mode === 'dark' ? DarkTheme.colors : DefaultTheme.colors),
-      primary: theme.primary,
-      background: theme.background,
-      // `card` backs the navigation header. Pinning it to the same chrome token
-      // as the tab bar keeps the top and bottom of every screen on one
-      // continuous surface in both light and dark mode.
-      card: theme.chrome,
-      text: theme.text,
-      border: theme.chromeBorder,
-      notification: theme.primary,
-    },
-  };
-
+  const reduced = useReducedMotion();
+  const navigationRef = useNavigationContainerRef();
+  const base = theme.mode === "dark" ? DarkTheme : DefaultTheme;
   return (
-    <>
-      {/* Android runs edge-to-edge (see android/gradle.properties), so the bars
-          are transparent and the app paints behind them — only the icon tint is
-          ours to set here. */}
-      <StatusBar barStyle={theme.statusBarStyle} backgroundColor="transparent" translucent />
-      <NavigationContainer theme={navigationTheme}>
-        <Stack.Navigator
-          id={undefined}
-          initialRouteName="MainTabs"
-          screenOptions={{
-            headerStyle: {
-              elevation: 0,
-              shadowOpacity: 0,
-              backgroundColor: theme.chrome,
-            },
-            headerTintColor: theme.text,
-            headerTitleStyle: {
-              fontWeight: '800',
-              fontSize: 18,
-              color: theme.text,
-            },
-            headerTitleAlign: 'left',
-            headerLeftContainerStyle: { paddingLeft: 4 },
-            headerRightContainerStyle: { paddingRight: 12 },
-            headerShadowVisible: false,
-            cardStyle: { backgroundColor: theme.background },
-          }}
-        >
-          <Stack.Screen name="MainTabs" component={MainTabs} options={{ headerShown: false }} />
-          <Stack.Screen
-            name="AddItem"
-            component={AddItemScreen}
-            options={{ title: 'Add Product' }}
-          />
-          <Stack.Screen
-            name="Billing"
-            component={BillingScreen}
-            options={{ title: 'Bill Customer' }}
-          />
-          <Stack.Screen
-            name="BillReview"
-            component={BillReviewScreen}
-            options={{ title: 'Review Bill' }}
-          />
-          <Stack.Screen
-            name="BillReceipt"
-            component={BillReceiptScreen}
-            options={{ title: 'Receipt' }}
-          />
-          <Stack.Screen
-            name="About"
-            component={AboutScreen}
-            options={{ title: 'About' }}
-          />
-          <Stack.Screen
-            name="RecentActivity"
-            component={RecentActivityScreen}
-            options={{ title: 'Recent Orders' }}
-          />
-          <Stack.Screen
-            name="Notifications"
-            component={NotificationsScreen}
-            options={{ title: 'Alerts' }}
-          />
-        </Stack.Navigator>
-      </NavigationContainer>
-    </>
+    <NavigationContainer
+      ref={navigationRef}
+      theme={{
+        ...base,
+        colors: {
+          ...base.colors,
+          primary: theme.primary,
+          background: theme.background,
+          card: theme.chrome,
+          text: theme.text,
+          border: theme.chromeBorder,
+          notification: theme.primary,
+        },
+      }}
+    >
+      <Stack.Navigator
+        id={undefined}
+        screenOptions={{
+          headerStyle: { backgroundColor: theme.chrome },
+          headerTintColor: theme.text,
+          headerTitleStyle: { fontFamily: "Inter_600SemiBold", fontSize: 16 },
+          headerShadowVisible: false,
+          contentStyle: { backgroundColor: theme.background },
+          animation: reduced ? "none" : "slide_from_right",
+          header: (props) => <StackHeader {...props} />,
+          statusBarStyle: theme.mode === "light" ? "dark" : "light",
+        }}
+      >
+        <Stack.Screen
+          name="MainTabs"
+          component={MainTabs}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="AddItem"
+          component={AddItemScreen}
+          options={({ route }) => ({
+            title: route.params?.productId ? "Edit product" : "Add product",
+          })}
+        />
+        <Stack.Screen
+          name="Billing"
+          component={BillingScreen}
+          options={{ title: "New bill" }}
+        />
+        <Stack.Screen
+          name="BillReview"
+          component={BillReviewScreen}
+          options={{ title: "Review & payment" }}
+        />
+        <Stack.Screen
+          name="BillReceipt"
+          component={BillReceiptScreen}
+          options={{ title: "Receipt" }}
+        />
+        <Stack.Screen
+          name="Management"
+          component={ManagementScreen}
+          options={{ title: "Management" }}
+        />
+        <Stack.Screen
+          name="ParkedBills"
+          component={ParkedBillsScreen}
+          options={{ title: "Parked bills" }}
+        />
+        <Stack.Screen
+          name="Purchases"
+          component={PurchasesScreen}
+          options={{ title: "Purchases" }}
+        />
+        <Stack.Screen name="Suppliers" component={SuppliersScreen} />
+        <Stack.Screen
+          name="Credit"
+          component={CreditScreen}
+          options={{ title: "Customer credit" }}
+        />
+        <Stack.Screen
+          name="StockHistory"
+          component={StockHistoryScreen}
+          options={{ title: "Stock history" }}
+        />
+        <Stack.Screen
+          name="Import"
+          component={ImportScreen}
+          options={{ title: "Import products" }}
+        />
+        <Stack.Screen
+          name="Backup"
+          component={BackupScreen}
+          options={{ title: "Backup & restore" }}
+        />
+        <Stack.Screen
+          name="Printer"
+          component={PrinterScreen}
+          options={{ title: "Receipt printer" }}
+        />
+        <Stack.Screen
+          name="RecentActivity"
+          component={RecentActivityScreen}
+          options={{ title: "Receipts" }}
+        />
+        <Stack.Screen
+          name="Notifications"
+          component={NotificationsScreen}
+          options={{ title: "Stock alerts" }}
+        />
+        <Stack.Screen
+          name="ProductPicker"
+          component={ProductPickerScreen}
+          options={{ title: "Add to cart", presentation: "modal" }}
+        />
+        <Stack.Screen
+          name="BusinessDetails"
+          component={BusinessDetailsScreen}
+          options={{ title: "Business details" }}
+        />
+        <Stack.Screen
+          name="About"
+          component={AboutScreen}
+          options={{ title: "About MOPX" }}
+        />
+      </Stack.Navigator>
+      <ExitHint navigationRef={navigationRef} />
+    </NavigationContainer>
   );
-};
-
-const AppShell = () => {
+}
+function AppShell() {
   const { theme, isReady } = useTheme();
   const [dataReady, setDataReady] = useState(false);
+  const [needsSetup, setNeedsSetup] = useState(false);
+  const [fontsLoaded, fontError] = useFonts({
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+    PlusJakartaSans_600SemiBold,
+    PlusJakartaSans_700Bold,
+    PlusJakartaSans_800ExtraBold,
+  });
+  const [splashHeld, setSplashHeld] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(
+      () => setSplashHeld(false),
+      Math.max(0, SPLASH_MIN_MS - (Date.now() - launchedAt)),
+    );
+    return () => clearTimeout(t);
+  }, []);
+  const [error, setError] = useState("");
+  const [attempt, setAttempt] = useState(0);
+  const appReady = isReady && dataReady && (fontsLoaded || fontError);
+  useEffect(() => {
+    if ((appReady && !splashHeld) || error)
+      void SplashScreen.hideAsync().catch(() => {});
+  }, [appReady, splashHeld, error]);
 
+  const retry = useCallback(() => {
+    setError("");
+    setAttempt((n) => n + 1);
+  }, []);
   useEffect(() => {
     let mounted = true;
-    // Run migrations + legacy migration once at startup so the themed splash
-    // only hands off to the app after the data layer is ready. On failure we
-    // still release the splash; screens/ErrorBoundary handle the error state.
     storageService
       .ensureDataLayerReady()
-      .catch((error) => console.error('Data layer init failed at startup:', error))
-      .finally(() => {
+      .then(async () => {
+        const profile = await getBusinessProfile();
+        const db = await getDatabase();
+        const history = await db.getFirstAsync<{ n: number }>(
+          "SELECT COUNT(*) AS n FROM sales",
+        );
         if (mounted) {
+          setNeedsSetup(!profile?.businessName?.trim() && !history?.n);
           setDataReady(true);
+          // Quiet daily update check, well after first paint.
+          setTimeout(() => void checkForUpdates().catch(() => {}), 8000);
         }
+      })
+      .catch((e) => {
+        if (mounted)
+          setError(e instanceof Error ? e.message : "Could not open shop data");
       });
     return () => {
       mounted = false;
     };
-  }, []);
-
+  }, [attempt]);
   useEffect(() => {
-    // Paint the native root view with the theme colour too. Without this the
-    // window behind the React tree stays the OS default, which flashes white on
-    // a dark theme during rotation, keyboard resize and screen transitions.
-    SystemUI.setBackgroundColorAsync(theme.background).catch(() => {});
-
-    // Android runs edge-to-edge, so the navigation bar is transparent and the
-    // app's own chrome shows through it. The button/pill tint still has to be
-    // flipped to follow the *app's* theme — the DayNight resource qualifiers in
-    // styles.xml only track the device theme, which is wrong whenever the user
-    // has overridden the theme in Settings.
-    if (Platform.OS === 'android') {
-      NavigationBar.setStyle(theme.mode === 'dark' ? 'light' : 'dark');
-    }
+    // Edge-to-edge: the app paints behind both system bars and only the icon
+    // tint follows the theme. RN adds its own scrims on Android < 10, so old
+    // devices keep legible buttons without any per-device code here.
+    void SystemUI.setBackgroundColorAsync(theme.background).catch(() => {});
+    if (Platform.OS === "android")
+      NavigationBar.setStyle(theme.mode === "dark" ? "dark" : "light");
   }, [theme.background, theme.mode]);
-
-  const ready = isReady && dataReady;
-
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
-      <AppNavigator />
-      <AppSplash theme={theme} visible={!ready} />
+      <StatusBar
+        translucent
+        backgroundColor="transparent"
+        barStyle={theme.mode === "light" ? "dark-content" : "light-content"}
+      />
+      {error ? (
+        <View style={{ flex: 1, justifyContent: "center", padding: 24 }}>
+          <Panel>
+            <Copy large>Could not open your shop</Copy>
+            <Notice message={error} error />
+            <Copy muted>
+              Your stored records have not been removed. Retry to reopen the
+              database.
+            </Copy>
+            <AppButton theme={theme} label="Try again" onPress={retry} />
+          </Panel>
+        </View>
+      ) : appReady ? (
+        needsSetup ? (
+          <SetupScreen onComplete={() => setNeedsSetup(false)} />
+        ) : (
+          <AppNavigator />
+        )
+      ) : null}
     </View>
   );
-};
-
-const App = () => {
+}
+export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <ThemeProvider>
-          <ErrorBoundary>
-            <CurrencyProvider>
-              <ToastProvider>
-                <DialogProvider>
-                  <AppShell />
-                </DialogProvider>
-              </ToastProvider>
-            </CurrencyProvider>
-          </ErrorBoundary>
-        </ThemeProvider>
+        <KeyboardProvider>
+          <ThemeProvider>
+            <TypographyProvider>
+              <ErrorBoundary>
+                <CurrencyProvider>
+                  <ToastProvider>
+                    <DialogProvider>
+                      <AppShell />
+                    </DialogProvider>
+                  </ToastProvider>
+                </CurrencyProvider>
+              </ErrorBoundary>
+            </TypographyProvider>
+          </ThemeProvider>
+        </KeyboardProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
-};
-
-export default App;
+}
