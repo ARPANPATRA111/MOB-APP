@@ -1,0 +1,166 @@
+# Changed files - MOPX 2.2
+
+Working-tree changes across the approved feature revamp and device-feedback iteration. No commit or push. User-edited `prompt.txt` is excluded.
+
+- [.easignore](../.easignore)
+- [.github/workflows/verify.yml](../.github/workflows/verify.yml)
+- [.gitignore](../.gitignore)
+- [App.tsx](../App.tsx)
+- [ErrorBoundary.tsx](../ErrorBoundary.tsx)
+- [README.md](../README.md)
+- [android/app/build.gradle](../android/app/build.gradle)
+- [android/app/src/main/AndroidManifest.xml](../android/app/src/main/AndroidManifest.xml)
+- [android/app/src/main/java/com/arpanpatra/mopx/MainActivity.kt](../android/app/src/main/java/com/arpanpatra/mopx/MainActivity.kt)
+- [android/app/src/main/res/values/strings.xml](../android/app/src/main/res/values/strings.xml)
+- [android/app/src/main/res/values/styles.xml](../android/app/src/main/res/values/styles.xml)
+- [app.json](../app.json)
+- [docs/CHANGED_FILES_2026-09.md](../docs/CHANGED_FILES_2026-09.md)
+- [docs/IMPLEMENTATION_2026-09.md](../docs/IMPLEMENTATION_2026-09.md)
+- [docs/ITERATION_2.md](../docs/ITERATION_2.md)
+- [docs/PROJECT_AUDIT_2026-09-13.md](../docs/PROJECT_AUDIT_2026-09-13.md)
+- [eas.json](../eas.json)
+- [metro.config.js](../metro.config.js)
+- [modules/retail-tools/android/build.gradle](../modules/retail-tools/android/build.gradle)
+- [modules/retail-tools/android/src/main/AndroidManifest.xml](../modules/retail-tools/android/src/main/AndroidManifest.xml)
+- [modules/retail-tools/android/src/main/java/expo/modules/retailtools/ArchiveCipher.kt](../modules/retail-tools/android/src/main/java/expo/modules/retailtools/ArchiveCipher.kt)
+- [modules/retail-tools/android/src/main/java/expo/modules/retailtools/RetailToolsModule.kt](../modules/retail-tools/android/src/main/java/expo/modules/retailtools/RetailToolsModule.kt)
+- [modules/retail-tools/android/src/test/java/expo/modules/retailtools/ArchiveCipherTest.kt](../modules/retail-tools/android/src/test/java/expo/modules/retailtools/ArchiveCipherTest.kt)
+- [modules/retail-tools/expo-module.config.json](../modules/retail-tools/expo-module.config.json)
+- [modules/retail-tools/package.json](../modules/retail-tools/package.json)
+- [package-lock.json](../package-lock.json)
+- [package.json](../package.json)
+- [screens/AboutScreen.tsx](../screens/AboutScreen.tsx)
+- [screens/AddItemScreen.tsx](../screens/AddItemScreen.tsx)
+- [screens/BackupScreen.tsx](../screens/BackupScreen.tsx)
+- [screens/BillReceiptScreen.tsx](../screens/BillReceiptScreen.tsx)
+- [screens/BillReviewScreen.tsx](../screens/BillReviewScreen.tsx)
+- [screens/BillingScreen.tsx](../screens/BillingScreen.tsx)
+- [screens/BusinessDetailsScreen.tsx](../screens/BusinessDetailsScreen.tsx)
+- [screens/CreditScreen.tsx](../screens/CreditScreen.tsx)
+- [screens/DashboardScreen.tsx](../screens/DashboardScreen.tsx)
+- [screens/ImportScreen.tsx](../screens/ImportScreen.tsx)
+- [screens/InventoryScreen.tsx](../screens/InventoryScreen.tsx)
+- [screens/ManagementScreen.tsx](../screens/ManagementScreen.tsx)
+- [screens/NotificationsScreen.tsx](../screens/NotificationsScreen.tsx)
+- [screens/ParkedBillsScreen.tsx](../screens/ParkedBillsScreen.tsx)
+- [screens/PrinterScreen.tsx](../screens/PrinterScreen.tsx)
+- [screens/ProductPickerScreen.tsx](../screens/ProductPickerScreen.tsx)
+- [screens/PurchasesScreen.tsx](../screens/PurchasesScreen.tsx)
+- [screens/RecentActivityScreen.tsx](../screens/RecentActivityScreen.tsx)
+- [screens/ReportsScreen.tsx](../screens/ReportsScreen.tsx)
+- [screens/SettingsScreen.tsx](../screens/SettingsScreen.tsx)
+- [screens/SetupScreen.tsx](../screens/SetupScreen.tsx)
+- [screens/StockHistoryScreen.tsx](../screens/StockHistoryScreen.tsx)
+- [screens/SuppliersScreen.tsx](../screens/SuppliersScreen.tsx)
+- [scripts/check-dependency-patches.cjs](../scripts/check-dependency-patches.cjs)
+- [scripts/test-sqlite.cjs](../scripts/test-sqlite.cjs)
+- [scripts/verify-native-config.cjs](../scripts/verify-native-config.cjs)
+- [src/__tests__/dependencySecurity.test.ts](../src/__tests__/dependencySecurity.test.ts)
+- [src/__tests__/migrate.test.ts](../src/__tests__/migrate.test.ts)
+- [src/__tests__/phase2Domain.test.ts](../src/__tests__/phase2Domain.test.ts)
+- [src/__tests__/saleRepository.test.ts](../src/__tests__/saleRepository.test.ts)
+- [src/components/BarcodeInputModal.tsx](../src/components/BarcodeInputModal.tsx)
+- [src/components/PaymentMethodSelector.tsx](../src/components/PaymentMethodSelector.tsx)
+- [src/components/ProductRow.tsx](../src/components/ProductRow.tsx)
+- [src/components/ProductScanner.tsx](../src/components/ProductScanner.tsx)
+- [src/components/__tests__/typography.test.ts](../src/components/__tests__/typography.test.ts)
+- [src/components/ui/AppBadge.tsx](../src/components/ui/AppBadge.tsx)
+- [src/components/ui/AppButton.tsx](../src/components/ui/AppButton.tsx)
+- [src/components/ui/AppEmptyState.tsx](../src/components/ui/AppEmptyState.tsx)
+- [src/components/ui/AppErrorState.tsx](../src/components/ui/AppErrorState.tsx)
+- [src/components/ui/AppHeader.tsx](../src/components/ui/AppHeader.tsx)
+- [src/components/ui/AppLoadingState.tsx](../src/components/ui/AppLoadingState.tsx)
+- [src/components/ui/AppScreen.tsx](../src/components/ui/AppScreen.tsx)
+- [src/components/ui/AppSplash.tsx](../src/components/ui/AppSplash.tsx)
+- [src/components/ui/AppTabBar.tsx](../src/components/ui/AppTabBar.tsx)
+- [src/components/ui/CommerceUI.tsx](../src/components/ui/CommerceUI.tsx)
+- [src/components/ui/DeltaChip.tsx](../src/components/ui/DeltaChip.tsx)
+- [src/components/ui/DialogProvider.tsx](../src/components/ui/DialogProvider.tsx)
+- [src/components/ui/InsightBars.tsx](../src/components/ui/InsightBars.tsx)
+- [src/components/ui/QuickActionTile.tsx](../src/components/ui/QuickActionTile.tsx)
+- [src/components/ui/SearchBar.tsx](../src/components/ui/SearchBar.tsx)
+- [src/components/ui/SectionHeader.tsx](../src/components/ui/SectionHeader.tsx)
+- [src/components/ui/SelectField.tsx](../src/components/ui/SelectField.tsx)
+- [src/components/ui/StackHeader.tsx](../src/components/ui/StackHeader.tsx)
+- [src/components/ui/StatCard.tsx](../src/components/ui/StatCard.tsx)
+- [src/components/ui/ToastProvider.tsx](../src/components/ui/ToastProvider.tsx)
+- [src/components/ui/TrendChart.tsx](../src/components/ui/TrendChart.tsx)
+- [src/contexts/ThemeContext.tsx](../src/contexts/ThemeContext.tsx)
+- [src/contexts/TypographyContext.tsx](../src/contexts/TypographyContext.tsx)
+- [src/db/database.ts](../src/db/database.ts)
+- [src/db/migrate.ts](../src/db/migrate.ts)
+- [src/db/migrations/004_commerce.ts](../src/db/migrations/004_commerce.ts)
+- [src/domain/__tests__/catalogSearch.test.ts](../src/domain/__tests__/catalogSearch.test.ts)
+- [src/domain/__tests__/chart.test.ts](../src/domain/__tests__/chart.test.ts)
+- [src/domain/__tests__/commerce.test.ts](../src/domain/__tests__/commerce.test.ts)
+- [src/domain/__tests__/fullBackupManifest.test.ts](../src/domain/__tests__/fullBackupManifest.test.ts)
+- [src/domain/__tests__/onboarding.test.ts](../src/domain/__tests__/onboarding.test.ts)
+- [src/domain/backup.ts](../src/domain/backup.ts)
+- [src/domain/cart.ts](../src/domain/cart.ts)
+- [src/domain/catalogSearch.ts](../src/domain/catalogSearch.ts)
+- [src/domain/chart.ts](../src/domain/chart.ts)
+- [src/domain/commerce.ts](../src/domain/commerce.ts)
+- [src/domain/fullBackupManifest.ts](../src/domain/fullBackupManifest.ts)
+- [src/domain/inventory.ts](../src/domain/inventory.ts)
+- [src/domain/money.ts](../src/domain/money.ts)
+- [src/domain/onboarding.ts](../src/domain/onboarding.ts)
+- [src/domain/receipt.ts](../src/domain/receipt.ts)
+- [src/domain/reportExport.ts](../src/domain/reportExport.ts)
+- [src/domain/reports.ts](../src/domain/reports.ts)
+- [src/hooks/useProductCatalog.ts](../src/hooks/useProductCatalog.ts)
+- [src/repositories/__tests__/inventoryRepository.test.ts](../src/repositories/__tests__/inventoryRepository.test.ts)
+- [src/repositories/categoryRepository.ts](../src/repositories/categoryRepository.ts)
+- [src/repositories/creditRepository.ts](../src/repositories/creditRepository.ts)
+- [src/repositories/draftRepository.ts](../src/repositories/draftRepository.ts)
+- [src/repositories/importRepository.ts](../src/repositories/importRepository.ts)
+- [src/repositories/inventoryRepository.ts](../src/repositories/inventoryRepository.ts)
+- [src/repositories/productRepository.ts](../src/repositories/productRepository.ts)
+- [src/repositories/purchaseRepository.ts](../src/repositories/purchaseRepository.ts)
+- [src/repositories/reportRepository.ts](../src/repositories/reportRepository.ts)
+- [src/repositories/restoreRepository.ts](../src/repositories/restoreRepository.ts)
+- [src/repositories/saleRepository.ts](../src/repositories/saleRepository.ts)
+- [src/repositories/settingsRepository.ts](../src/repositories/settingsRepository.ts)
+- [src/services/backupReminders.ts](../src/services/backupReminders.ts)
+- [src/services/billingSession.ts](../src/services/billingSession.ts)
+- [src/services/dataEvents.ts](../src/services/dataEvents.ts)
+- [src/services/fullBackup.ts](../src/services/fullBackup.ts)
+- [src/services/imageStorage.ts](../src/services/imageStorage.ts)
+- [src/services/legacyAsyncStorageMigration.ts](../src/services/legacyAsyncStorageMigration.ts)
+- [src/services/receiptPrinting.ts](../src/services/receiptPrinting.ts)
+- [src/services/retailNative.ts](../src/services/retailNative.ts)
+- [src/services/storage.ts](../src/services/storage.ts)
+- [src/theme/typography.ts](../src/theme/typography.ts)
+- [src/types.ts](../src/types.ts)
+- [tsconfig.json](../tsconfig.json)
+
+## Added in the 2.3 iOS-style iteration (September 16, 2026)
+
+- [docs/ITERATION_3.md](ITERATION_3.md) — phases, root causes, checklist and delivery path.
+- [android/app/build.gradle](../android/app/build.gradle) — version 2.3.0 / code 8; `create*UpdatesResources` never up-to-date.
+- [android/app/src/main/res/values/colors.xml](../android/app/src/main/res/values/colors.xml), [values-night/colors.xml](../android/app/src/main/res/values-night/colors.xml), [values/strings.xml](../android/app/src/main/res/values/strings.xml), `drawable-*/splashscreen_logo.png`, `drawable-night-*/splashscreen_logo.png` — splash aligned with the theme and regenerated from the MOPX mark.
+- [assets/logo-mark-light.png](../assets/logo-mark-light.png), [assets/logo-mark-dark.png](../assets/logo-mark-dark.png), [assets/splash-icon.png](../assets/splash-icon.png).
+- [src/contexts/ThemeContext.tsx](../src/contexts/ThemeContext.tsx), [src/contexts/TypographyContext.tsx](../src/contexts/TypographyContext.tsx), [src/theme/typography.ts](../src/theme/typography.ts).
+- [src/components/ui/CommerceUI.tsx](../src/components/ui/CommerceUI.tsx), [AppButton.tsx](../src/components/ui/AppButton.tsx), [StackHeader.tsx](../src/components/ui/StackHeader.tsx), [TabHeader.tsx](../src/components/ui/TabHeader.tsx) (new), [AppTabBar.tsx](../src/components/ui/AppTabBar.tsx), [AppSplash.tsx](../src/components/ui/AppSplash.tsx), [SelectField.tsx](../src/components/ui/SelectField.tsx), [TrendChart.tsx](../src/components/ui/TrendChart.tsx).
+- [src/components/ProductRow.tsx](../src/components/ProductRow.tsx), [src/components/ProductScanner.tsx](../src/components/ProductScanner.tsx).
+- [src/domain/currency.ts](../src/domain/currency.ts) (56 currencies, picker labels), [src/domain/chart.ts](../src/domain/chart.ts) and its test.
+- Screens: [Setup](../screens/SetupScreen.tsx), [Dashboard](../screens/DashboardScreen.tsx), [Settings](../screens/SettingsScreen.tsx), [BusinessDetails](../screens/BusinessDetailsScreen.tsx), [About](../screens/AboutScreen.tsx), [Management](../screens/ManagementScreen.tsx), [Inventory](../screens/InventoryScreen.tsx), [AddItem](../screens/AddItemScreen.tsx), [Billing](../screens/BillingScreen.tsx), [ProductPicker](../screens/ProductPickerScreen.tsx), [BillReview](../screens/BillReviewScreen.tsx), [Reports](../screens/ReportsScreen.tsx).
+- [App.tsx](../App.tsx) — large-title tab headers, inverted system bar styles.
+- [app.json](../app.json), [package.json](../package.json), [README.md](../README.md).
+
+## Added in the 2.4 iteration (September 16, 2026)
+
+- [docs/ITERATION_4.md](ITERATION_4.md), [docs/PRODUCTION_CHECKLIST_2.4.md](PRODUCTION_CHECKLIST_2.4.md), [docs/BARCODE_MARKET_RESEARCH.md](BARCODE_MARKET_RESEARCH.md), [docs/update.json](update.json).
+- [src/components/ProductScanner.tsx](../src/components/ProductScanner.tsx) (single/continuous modes, presence suppression, torch memory) and [its test](../src/components/__tests__/productScanner.test.tsx).
+- [src/components/ui/ToastProvider.tsx](../src/components/ui/ToastProvider.tsx), [src/components/ui/AppSplash.tsx](../src/components/ui/AppSplash.tsx), [src/contexts/TypographyContext.tsx](../src/contexts/TypographyContext.tsx).
+- [src/domain/appUpdate.ts](../src/domain/appUpdate.ts), [src/services/updateCheck.ts](../src/services/updateCheck.ts), [src/domain/barcode.ts](../src/domain/barcode.ts) (in-store EAN-13 helpers appended) and tests.
+- Screens: [Billing](../screens/BillingScreen.tsx), [BillReceipt](../screens/BillReceiptScreen.tsx), [Dashboard](../screens/DashboardScreen.tsx), [Settings](../screens/SettingsScreen.tsx), [AddItem](../screens/AddItemScreen.tsx), [Setup](../screens/SetupScreen.tsx).
+- [App.tsx](../App.tsx) (splash floor, immersive bars, update check, fonts), [app.json](../app.json), [package.json](../package.json) (`@expo-google-fonts/plus-jakarta-sans`), [android/app/build.gradle](../android/app/build.gradle) (2.4.0 / 9), [AndroidManifest.xml](../android/app/src/main/AndroidManifest.xml) (OTA check NEVER), `values/strings.xml`.
+
+## Added in the 2.4.1 iteration (September 16, 2026)
+
+- [docs/ITERATION_5.md](ITERATION_5.md) — stall root causes, splash rework, benchmarks, OTA, app-icon answer.
+- [src/services/productImages.ts](../src/services/productImages.ts) (new: 640 px main + 144 px thumbnail), [src/services/imageStorage.ts](../src/services/imageStorage.ts) (thumbnails survive orphan cleanup), [src/components/ProductRow.tsx](../src/components/ProductRow.tsx), [screens/BillingScreen.tsx](../screens/BillingScreen.tsx) (thumbnails).
+- [screens/AddItemScreen.tsx](../screens/AddItemScreen.tsx) (independent photo state, required-field highlighting, existing-barcode redirect, no crop screen), [src/components/ui/CommerceUI.tsx](../src/components/ui/CommerceUI.tsx) (`FormRow` invalid/required), [src/components/ui/AppScreen.tsx](../src/components/ui/AppScreen.tsx) (`scrollToTop` handle).
+- Splash: `drawable-*/splashscreen_logo.png`, `drawable-night-*/splashscreen_logo.png`, [assets/splash-icon.png](../assets/splash-icon.png), [assets/logo-disc.png](../assets/logo-disc.png); [App.tsx](../App.tsx) holds the native splash; `src/components/ui/AppSplash.tsx` removed.
+- [src/services/updateCheck.ts](../src/services/updateCheck.ts) (EAS OTA check), [screens/SettingsScreen.tsx](../screens/SettingsScreen.tsx), [app.json](../app.json) and [AndroidManifest.xml](../android/app/src/main/AndroidManifest.xml) (OTA `ON_LOAD`/`ALWAYS`), [docs/update.json](update.json).
+- [scripts/test-sqlite.cjs](../scripts/test-sqlite.cjs) (credit/customer benchmark), [android/app/build.gradle](../android/app/build.gradle) (2.4.1 / 10), `values/strings.xml`, [package.json](../package.json).

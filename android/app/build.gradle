@@ -93,8 +93,8 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         // Increment for each locally distributed APK.
-        versionCode 11
-        versionName "2.4.2"
+        versionCode 12
+        versionName "2.5.0"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }
