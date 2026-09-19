@@ -6,6 +6,7 @@ import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Theme } from "../../contexts/ThemeContext";
 import { useKeyboardOpen } from "../../hooks/useKeyboardOpen";
+import { CONTENT_MAX_WIDTH } from "./AppScreen";
 
 /** Route name of the action-only slot. It renders as the raised centre button. */
 export const ACTION_TAB_NAME = "NewBill";
@@ -46,9 +47,13 @@ const AppTabBar: React.FC<BottomTabBarProps & { theme: Theme; onAction: () => vo
           backgroundColor: theme.chrome,
           borderTopColor: theme.chromeBorder,
           paddingBottom: Math.max(insets.bottom, 6),
+          // Landscape cutouts sit beside the bar, not above it.
+          paddingLeft: insets.left,
+          paddingRight: insets.right,
         },
       ]}
     >
+      <View style={styles.row}>
       {state.routes.map((route, index) => {
         const focused = state.index === index;
         if (route.name === ACTION_TAB_NAME) {
@@ -94,17 +99,25 @@ const AppTabBar: React.FC<BottomTabBarProps & { theme: Theme; onAction: () => vo
           </Pressable>
         );
       })}
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   bar: {
-    flexDirection: "row",
-    alignItems: "flex-start",
     borderTopWidth: StyleSheet.hairlineWidth,
     paddingTop: 6,
+  },
+  // The bar surface spans the window; the tabs themselves stay in the same
+  // centred column the screens use, so a tablet does not fling them to the edges.
+  row: {
+    flexDirection: "row",
+    alignItems: "flex-start",
     paddingHorizontal: 4,
+    width: "100%",
+    maxWidth: CONTENT_MAX_WIDTH,
+    alignSelf: "center",
   },
   tab: { flex: 1, alignItems: "center", gap: 2, minHeight: 48, paddingTop: 3 },
   label: { fontSize: 10, fontWeight: "500" },

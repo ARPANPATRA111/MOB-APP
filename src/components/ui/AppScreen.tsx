@@ -1,6 +1,7 @@
 import React, { forwardRef, useContext, useImperativeHandle, useRef, useState } from "react";
 import {
   ScrollView,
+  StyleSheet,
   View,
   type ViewStyle,
   type RefreshControlProps,
@@ -20,6 +21,19 @@ import {
   KeyboardStickyView,
 } from "react-native-keyboard-controller";
 import type { Theme } from "../../contexts/ThemeContext";
+
+/**
+ * Widest the content column ever gets. Phones are narrower than this so nothing
+ * changes there; on a tablet, an unfolded foldable or a landscape window the
+ * column centres instead of stretching a billing form across 1000 px.
+ */
+export const CONTENT_MAX_WIDTH = 640;
+
+const styles = StyleSheet.create({
+  column: { width: "100%", maxWidth: CONTENT_MAX_WIDTH, alignSelf: "center" },
+  filledColumn: { flex: 1, width: "100%", maxWidth: CONTENT_MAX_WIDTH, alignSelf: "center" },
+});
+
 export interface AppScreenHandle {
   scrollToTop: () => void;
 }
@@ -74,7 +88,7 @@ const AppScreen = forwardRef<AppScreenHandle, Props>(function AppScreen(
           style={style}
           contentContainerStyle={[padding, contentStyle]}
         >
-          {children}
+          <View style={styles.column}>{children}</View>
         </KeyboardAwareScrollView>
       ) : (
         <ScrollView
@@ -83,7 +97,7 @@ const AppScreen = forwardRef<AppScreenHandle, Props>(function AppScreen(
           style={style}
           contentContainerStyle={[padding, contentStyle]}
         >
-          {children}
+          <View style={styles.column}>{children}</View>
         </ScrollView>
       )}
       {footer && (
@@ -95,7 +109,7 @@ const AppScreen = forwardRef<AppScreenHandle, Props>(function AppScreen(
             onLayout={(e) => setFooterHeight(e.nativeEvent.layout.height)}
             style={{ paddingBottom: bottom, backgroundColor: theme.chrome }}
           >
-            {footer}
+            <View style={styles.column}>{footer}</View>
           </View>
         </KeyboardStickyView>
       )}
@@ -114,11 +128,11 @@ const AppScreen = forwardRef<AppScreenHandle, Props>(function AppScreen(
           style,
         ]}
       >
-        {children}
+        <View style={styles.filledColumn}>{children}</View>
       </View>
       {footer && (
         <View style={{ paddingBottom: bottom, backgroundColor: theme.chrome }}>
-          {footer}
+          <View style={styles.column}>{footer}</View>
         </View>
       )}
     </KeyboardAvoidingView>

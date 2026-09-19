@@ -1,5 +1,6 @@
 package com.arpanpatra.mopx
 
+import android.content.pm.ActivityInfo
 import android.os.Build
 import android.os.Bundle
 
@@ -13,6 +14,15 @@ import expo.modules.splashscreen.SplashScreenManager
 
 class MainActivity : ReactActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
+    // Compact screens stay portrait so billing stays a one-handed job; anything
+    // sw600dp and up (tablets, unfolded foldables, desktop windows) is free to
+    // rotate. Kept out of the manifest on purpose: Android 16 ignores manifest
+    // orientation locks on large screens, and Play flags them as a restriction.
+    requestedOrientation = if (resources.getBoolean(R.bool.lock_portrait)) {
+      ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+    } else {
+      ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+    }
     // Set the theme to AppTheme BEFORE onCreate to support
     // coloring the background, status bar, and navigation bar.
     // This is required for expo-splash-screen.

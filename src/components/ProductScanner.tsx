@@ -8,6 +8,7 @@ import {
   StyleSheet,
   TextInput,
   View,
+  useWindowDimensions,
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { CameraView, useCameraPermissions } from "expo-camera";
@@ -82,6 +83,11 @@ export default function ProductScanner({
 }) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
+  // The viewfinder is sized from the live window, so a short landscape or
+  // freeform window still fits the frame between the two control rows.
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const frameHeight = Math.round(Math.min(200, windowHeight * 0.38));
+  const frameWidth = Math.round(Math.min(280, windowWidth * 0.8));
   const [permission, requestPermission] = useCameraPermissions();
   const focused = useIsFocused();
   const [open, setOpen] = useState(false);
@@ -277,9 +283,9 @@ export default function ProductScanner({
           )}
           <View pointerEvents="none" style={StyleSheet.absoluteFill}>
             <View style={styles.dim} />
-            <View style={{ flexDirection: "row", height: 200 }}>
+            <View style={{ flexDirection: "row", height: frameHeight }}>
               <View style={[styles.dim, { flex: 1 }]} />
-              <View style={styles.window}>
+              <View style={{ width: frameWidth, height: frameHeight }}>
                 {(["tl", "tr", "bl", "br"] as const).map((corner) => (
                   <View
                     key={corner}
@@ -337,7 +343,7 @@ export default function ProductScanner({
 
           {/* Feedback chip just under the viewfinder */}
           {feedback && (
-            <View pointerEvents="none" style={{ position: "absolute", left: 24, right: 24, top: "50%", marginTop: 112, alignItems: "center" }}>
+            <View pointerEvents="none" style={{ position: "absolute", left: 24, right: 24, top: "50%", marginTop: frameHeight / 2 + 12, alignItems: "center" }}>
               <View
                 style={{
                   flexDirection: "row",
@@ -410,7 +416,6 @@ export default function ProductScanner({
 
 const styles = StyleSheet.create({
   dim: { backgroundColor: "rgba(0,0,0,0.5)", flex: 1 },
-  window: { width: 280, height: 200 },
   corner: { position: "absolute", width: 30, height: 30 },
   roundButton: {
     width: 42,

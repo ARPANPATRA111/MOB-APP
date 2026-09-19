@@ -1,0 +1,5 @@
+<resources>
+  <!-- Tablets, foldables and desktop windows rotate freely; every screen is
+       width-adaptive, so landscape is a supported layout there, not a fallback. -->
+  <bool name="lock_portrait">false</bool>
+</resources>

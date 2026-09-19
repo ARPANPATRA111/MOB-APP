@@ -1,0 +1,6 @@
+<resources>
+  <!-- Phones keep the one-handed portrait billing layout. The manifest carries no
+       screenOrientation any more: Android 16 ignores such locks on large screens,
+       so expressing the rule here is the only way it can vary by screen size. -->
+  <bool name="lock_portrait">true</bool>
+</resources>

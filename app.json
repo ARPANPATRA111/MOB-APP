@@ -3,7 +3,7 @@
     "name": "MOPX",
     "slug": "mob-app",
     "version": "2.5.1",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "splash": {
