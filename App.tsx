@@ -34,12 +34,13 @@ import {
 } from "@react-navigation/bottom-tabs";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { Platform, StatusBar, View } from "react-native";
+import { Platform, View } from "react-native";
 import * as NavigationBar from "expo-navigation-bar";
 import * as SystemUI from "expo-system-ui";
 import { ThemeProvider, useTheme } from "./src/contexts/ThemeContext";
 import { CurrencyProvider } from "./src/contexts/CurrencyContext";
 import { storageService } from "./src/services/storage";
+import { setStatusBarAppearance } from "./src/services/retailNative";
 import AppTabBar from "./src/components/ui/AppTabBar";
 import StackHeader from "./src/components/ui/StackHeader";
 import TabHeader from "./src/components/ui/TabHeader";
@@ -348,17 +349,18 @@ function AppShell() {
     // Edge-to-edge: the app paints behind both system bars and only the icon
     // tint follows the theme. RN adds its own scrims on Android < 10, so old
     // devices keep legible buttons without any per-device code here.
+    //
+    // Both tints go through WindowInsetsController rather than React Native's
+    // StatusBar component: that one also reads and writes Window.statusBarColor,
+    // which Android 15 deprecated and which is a no-op under edge-to-edge anyway.
     void SystemUI.setBackgroundColorAsync(theme.background).catch(() => {});
-    if (Platform.OS === "android")
+    if (Platform.OS === "android") {
+      setStatusBarAppearance(theme.mode === "light");
       NavigationBar.setStyle(theme.mode === "dark" ? "dark" : "light");
+    }
   }, [theme.background, theme.mode]);
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
-      <StatusBar
-        translucent
-        backgroundColor="transparent"
-        barStyle={theme.mode === "light" ? "dark-content" : "light-content"}
-      />
       {error ? (
         <View style={{ flex: 1, justifyContent: "center", padding: 24 }}>
           <Panel>

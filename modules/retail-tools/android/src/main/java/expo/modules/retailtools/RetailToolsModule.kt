@@ -2,6 +2,8 @@ package expo.modules.retailtools
 import android.bluetooth.BluetoothManager
 import android.graphics.BitmapFactory
 import android.net.Uri
+import androidx.core.view.WindowInsetsControllerCompat
+import expo.modules.kotlin.functions.Queues
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import java.io.*
@@ -21,6 +23,15 @@ class RetailToolsModule : Module() {
   }
   override fun definition() = ModuleDefinition {
     Name("RetailTools")
+    // Status bar icon tint. React Native's StatusBar module can do this, but it
+    // reads and writes Window.statusBarColor on the way, which Android 15
+    // deprecated and Play flags. WindowInsetsControllerCompat touches only the
+    // appearance bit and is the supported route on every version we ship to.
+    // `lightBar` describes the bar, not the icons: true = light bar, dark icons.
+    AsyncFunction("setStatusBarAppearance") { lightBar: Boolean ->
+      val window = appContext.throwingActivity.window
+      WindowInsetsControllerCompat(window, window.decorView).isAppearanceLightStatusBars = lightBar
+    }.runOnQueue(Queues.MAIN)
     AsyncFunction("packBackup") { directory: String, destination: String, password: String ->
       val root = owned(directory); val output = owned(destination)
       val entries = root.walkTopDown().filter { it.isFile }.toList()
