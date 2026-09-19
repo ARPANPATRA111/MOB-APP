@@ -32,6 +32,10 @@ assert.ok(
   'edge-to-edge stays on, so no deprecated status bar colour calls run'
 );
 assert.ok(
+  /^android\.enableMinifyInReleaseBuilds=true$/m.test(properties),
+  'release builds run R8, so the DEX is obfuscated and shrunk'
+);
+assert.ok(
   gradle.includes('signingConfig signingConfigs.release'),
   'release signing uses release credentials'
 );
