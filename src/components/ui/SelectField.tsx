@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from "react";
-import { FlatList, Keyboard, Modal, Pressable, TextInput, View } from "react-native";
+import { FlatList, Keyboard, Modal, Pressable, StyleSheet, TextInput, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../../contexts/ThemeContext";
 import { AppText } from "../../contexts/TypographyContext";
 import { SearchField, useInTable } from "./CommerceUI";
+import { CONTENT_MAX_WIDTH } from "./AppScreen";
 
 /**
  * iOS picker row: label left, current value right, opens a sheet of options.
@@ -89,10 +90,13 @@ export default function SelectField({
         statusBarTranslucent
         onRequestClose={() => setOpen(false)}
       >
+        <View style={{ flex: 1, justifyContent: "flex-end" }}>
+        {/* Fills the window rather than just the space above the sheet, so the
+            strips either side of a capped sheet dim and dismiss like the rest. */}
         <Pressable
           accessibilityLabel="Dismiss"
           onPress={() => setOpen(false)}
-          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.35)" }}
+          style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.35)" }]}
         />
         <View
           style={{
@@ -101,6 +105,11 @@ export default function SelectField({
             borderTopRightRadius: 18,
             maxHeight: "78%",
             paddingBottom: insets.bottom + 8,
+            // Matches the screens' column so the sheet does not run the width
+            // of a tablet with one option row stranded on the far left.
+            width: "100%",
+            maxWidth: CONTENT_MAX_WIDTH,
+            alignSelf: "center",
           }}
         >
           <View style={{ alignItems: "center", paddingTop: 8 }}>
@@ -181,6 +190,7 @@ export default function SelectField({
               </AppText>
             }
           />
+        </View>
         </View>
       </Modal>
     </>
