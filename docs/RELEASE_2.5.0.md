@@ -89,7 +89,7 @@ The release APK was installed on a fresh emulator: cold start with the disc spla
 ### Full description
 
 ```
-MOPX is a point-of-sale and stock app for small shops that works completely offline. There is no account, no cloud and no monthly fee — every record stays on your phone.
+MOPX is a point-of-sale and stock app for small shops that works completely offline. There is no account, no cloud and no monthly fee, every record stays on your phone.
 
 BILLING
 • Scan barcodes continuously to build a bill, or pick products without a barcode from a searchable list

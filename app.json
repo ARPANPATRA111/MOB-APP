@@ -2,7 +2,7 @@
   "expo": {
     "name": "MOPX",
     "slug": "mob-app",
-    "version": "2.5.0",
+    "version": "2.5.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -88,7 +88,7 @@
       "fallbackToCacheTimeout": 0,
       "url": "https://u.expo.dev/17cfda77-984c-4ef0-aa9b-5834145c986e"
     },
-    "runtimeVersion": "2.5.0",
+    "runtimeVersion": "2.5.1",
     "extra": {
       "appVariant": "production",
       "expo-navigation-bar": {
