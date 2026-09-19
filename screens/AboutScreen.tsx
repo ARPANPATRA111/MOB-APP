@@ -1,71 +1,84 @@
-import React from 'react';
-import { Alert, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useTheme, type Theme } from '../src/contexts/ThemeContext';
-import { developerInfo, isAllowedDeveloperUrl } from '../src/domain/developerInfo';
-import { APP_FULL_NAME, APP_MEANING } from '../src/domain/branding';
-import AppCard from '../src/components/ui/AppCard';
-import AppHeader from '../src/components/ui/AppHeader';
-import AppScreen from '../src/components/ui/AppScreen';
-import SectionHeader from '../src/components/ui/SectionHeader';
-import { typography } from '../src/theme/typography';
+import React from "react";
+import Constants from "expo-constants";
+import { Alert, Image, Linking, View } from "react-native";
+import { useTheme } from "../src/contexts/ThemeContext";
+import { AppText } from "../src/contexts/TypographyContext";
+import {
+  developerInfo,
+  isAllowedDeveloperUrl,
+} from "../src/domain/developerInfo";
+import { APP_MEANING, APP_TAGLINE } from "../src/domain/branding";
+import AppScreen from "../src/components/ui/AppScreen";
+import { Copy, Group, ListRow, Panel } from "../src/components/ui/CommerceUI";
+
+const marks = {
+  light: require("../assets/logo-mark-light.png"),
+  dark: require("../assets/logo-mark-dark.png"),
+};
 
 const AboutScreen: React.FC = () => {
   const { theme } = useTheme();
-  const styles = createStyles(theme);
 
   const openUrl = async (url: string) => {
     try {
-      if (!isAllowedDeveloperUrl(url)) {
-        throw new Error('Unsupported link');
-      }
-      if (!(await Linking.canOpenURL(url))) {
-        throw new Error('This device cannot open the link');
-      }
+      if (!isAllowedDeveloperUrl(url)) throw new Error("Unsupported link");
+      if (!(await Linking.canOpenURL(url)))
+        throw new Error("This device cannot open the link");
       await Linking.openURL(url);
     } catch (error) {
-      Alert.alert('Link unavailable', (error as Error).message);
+      Alert.alert("Link unavailable", (error as Error).message);
     }
   };
 
   return (
     <AppScreen theme={theme}>
-      <AppHeader theme={theme} title={`About ${APP_FULL_NAME}`} subtitle={APP_MEANING} />
-
-      <AppCard theme={theme} style={styles.section}>
-        <SectionHeader theme={theme} title="Purpose" />
-        <Text style={styles.body}>
-          MOPX is an offline-first retail app for small vendors and shopkeepers who need fast billing,
-          inventory tracking, receipts, and local reports without depending on internet access.
-        </Text>
-      </AppCard>
-
-      <AppCard theme={theme} style={styles.section}>
-        <SectionHeader theme={theme} title="Developer" />
-        <Text style={styles.name}>{developerInfo.name}</Text>
-        <Text style={styles.body}>{developerInfo.description}</Text>
-        <View style={styles.links}>
-          <TouchableOpacity style={styles.linkRow} onPress={() => openUrl(`mailto:${developerInfo.email}`)}>
-            <Ionicons name="mail-outline" size={20} color={theme.primary} />
-            <Text style={styles.linkText}>{developerInfo.email}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.linkRow} onPress={() => openUrl(developerInfo.portfolio)}>
-            <Ionicons name="globe-outline" size={20} color={theme.primary} />
-            <Text style={styles.linkText}>arpan111.vercel.app</Text>
-          </TouchableOpacity>
-        </View>
-      </AppCard>
+      <View style={{ alignItems: "center", paddingVertical: 20, gap: 4 }}>
+        <Image
+          source={marks[theme.mode]}
+          style={{ width: 84, height: 84, marginBottom: 8 }}
+          resizeMode="contain"
+        />
+        <AppText style={{ color: theme.text, fontSize: 22, fontWeight: "700", letterSpacing: 1 }}>
+          MOPX
+        </AppText>
+        <Copy muted>
+          {APP_TAGLINE} · v{Constants.expoConfig?.version ?? ""}
+        </Copy>
+        <Copy muted>{APP_MEANING}</Copy>
+      </View>
+      <Panel title="About">
+        <Copy>
+          MOPX is an offline-first retail app for small shops: fast billing,
+          stock tracking, receipts and local reports without needing internet.
+        </Copy>
+      </Panel>
+      <Panel
+        title="Your records"
+        footer="Android automatic backup is disabled. Save a backup outside your phone before uninstalling or changing devices."
+      >
+        <Copy>
+          Records stay in this app on your phone; there is no account or cloud
+          sync. Backups are password-encrypted. Receipt PDFs and CSV exports are
+          readable by anyone you share them with.
+        </Copy>
+      </Panel>
+      <Group title="Developer" footer={developerInfo.description}>
+        <ListRow icon="person" iconColor="#5856d6" title={developerInfo.name} />
+        <ListRow
+          icon="mail"
+          iconColor="#0a7aff"
+          title={developerInfo.email}
+          onPress={() => openUrl(`mailto:${developerInfo.email}`)}
+        />
+        <ListRow
+          icon="globe"
+          iconColor="#34c759"
+          title="arpan111.vercel.app"
+          onPress={() => openUrl(developerInfo.portfolio)}
+        />
+      </Group>
     </AppScreen>
   );
 };
-
-const createStyles = (theme: Theme) => StyleSheet.create({
-  section: { marginBottom: 12, gap: 8 },
-  body: { color: theme.textSecondary, ...typography.body },
-  name: { color: theme.text, ...typography.sectionTitle },
-  links: { gap: 10, marginTop: 8 },
-  linkRow: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  linkText: { color: theme.primary, ...typography.bodyStrong },
-});
 
 export default AboutScreen;

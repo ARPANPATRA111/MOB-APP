@@ -1,700 +1,563 @@
-// AddItemScreen.tsx
-
-import React, { useState, useEffect, useRef } from 'react';
+import Ionicons from "@expo/vector-icons/Ionicons";
+import SelectField from "../src/components/ui/SelectField";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Image, Pressable, View } from "react-native";
+import * as ImagePicker from "expo-image-picker";
+import { useNavigation, useRoute } from "@react-navigation/native";
+import AppScreen, { type AppScreenHandle } from "../src/components/ui/AppScreen";
+import AppButton from "../src/components/ui/AppButton";
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  TextInput,
-  KeyboardAvoidingView,
-  Platform,
-  Image,
-  ActivityIndicator,
-  ScrollView,
-} from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { CameraView, BarcodeScanningResult, Camera } from 'expo-camera';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { Audio } from 'expo-av';
-import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system/legacy';
-import * as ImageManipulator from 'expo-image-manipulator';
-import { FontAwesome5, Ionicons } from '@expo/vector-icons';
-import { useTheme, type Theme } from '../src/contexts/ThemeContext';
-import { RootStackParamList } from '../App';
-import BarcodeInputModal from '../src/components/BarcodeInputModal';
-import { storageService } from '../src/services/storage';
-import { classifyBarcode } from '../src/domain/barcode';
-import { normalizeName } from '../src/domain/validation';
-import { useToast } from '../src/components/ui/ToastProvider';
-import { useDialog } from '../src/components/ui/DialogProvider';
+  Busy,
+  FormRow,
+  Group,
+  ListRow,
+  Notice,
+  useAction,
+} from "../src/components/ui/CommerceUI";
+import ProductScanner from "../src/components/ProductScanner";
+import { AppText } from "../src/contexts/TypographyContext";
+import { useTheme } from "../src/contexts/ThemeContext";
+import { useCurrency } from "../src/contexts/CurrencyContext";
+import { toCents } from "../src/domain/money";
+import { PRODUCT_UNITS } from "../src/domain/commerce";
+import { generateInStoreBarcode } from "../src/domain/barcode";
+import {
+  createProduct,
+  getProductByBarcode,
+  getProductById,
+  softDeleteProduct,
+  updateProduct,
+  type ProductRecord,
+} from "../src/repositories/productRepository";
+import { removeProductPhoto, storeProductPhoto } from "../src/services/productImages";
+import { notifyDataChanged } from "../src/services/dataEvents";
+import { useDialog } from "../src/components/ui/DialogProvider";
+import { useToast } from "../src/components/ui/ToastProvider";
 
-type AddItemScreenProps = {
-  navigation: StackNavigationProp<RootStackParamList, 'AddItem'>;
-};
+type Field = "name" | "price" | "quantity" | "barcode";
 
-interface Item {
-  barcode: string;
-  name: string;
-  quantity: number;
-  price: number;
-  category?: string;
-  imageUri?: string;
+/** Only these are mandatory; the barcode is generated when blank and the photo is optional. */
+const REQUIRED: Field[] = ["name", "price", "quantity"];
+const FIELD_LABEL: Record<Field, string> = { name: "Name", price: "Price", quantity: "In stock", barcode: "Code" };
+/** How long the red status line under the form stays up. */
+const STATUS_MS = 3000;
+/** After this long without a reply the status line says the database is busy. */
+const SLOW_SAVE_MS = 6000;
+
+/** Validation problem tied to one form row, so the row can be highlighted. */
+class FieldError extends Error {
+  constructor(
+    readonly field: Field | null,
+    message: string,
+  ) {
+    super(message);
+  }
 }
 
-const AddItemScreen: React.FC<AddItemScreenProps> = ({ navigation }) => {
+/** Picks the row an error message is about, for messages raised inside the repository. */
+const fieldFor = (message: string): Field | null =>
+  /price|money|amount/i.test(message)
+    ? "price"
+    : /quantit|stock/i.test(message)
+      ? "quantity"
+      : /barcode|code/i.test(message)
+        ? "barcode"
+        : /name/i.test(message)
+          ? "name"
+          : null;
+
+export default function AddItemScreen() {
   const { theme } = useTheme();
-  const toast = useToast();
-  const dialog = useDialog();
-  const insets = useSafeAreaInsets();
-  const styles = createStyles(theme);
+  const currency = useCurrency();
+  const navigation = useNavigation<any>();
+  const route = useRoute<any>();
+  const productId = route.params?.productId as string | undefined;
 
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
-  const [scanned, setScanned] = useState(false);
-  const [scannedItem, setScannedItem] = useState<Item | null>(null);
-  const [itemName, setItemName] = useState('');
-  const [quantity, setQuantity] = useState('1');
-  const [price, setPrice] = useState('');
-  const [productImage, setProductImage] = useState<string | null>(null);
-  const [existingProduct, setExistingProduct] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [showBarcodeInput, setShowBarcodeInput] = useState(false);
-  const [categories, setCategories] = useState<string[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [details, setDetails] = useState(false);
+  const [original, setOriginal] = useState<ProductRecord | null>(null);
+  const [loading, setLoading] = useState(!!productId);
+  const [loadError, setLoadError] = useState("");
+  const [invalid, setInvalid] = useState<Field[]>([]);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [existing, setExisting] = useState<ProductRecord | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+  const screen = useRef<AppScreenHandle>(null);
+  const newPhotos = useRef<string[]>([]);
+  const mounted = useRef(true);
+  const statusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const soundRef = useRef<Audio.Sound | null>(null);
-  // Ref guard prevents duplicate onBarcodeScanned callbacks firing before the
-  // `scanned` state commits (a real race with the camera callback).
-  const processingRef = useRef(false);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const { status: cameraStatus } = await Camera.requestCameraPermissionsAsync();
-        setHasPermission(cameraStatus === 'granted');
-        await ImagePicker.requestCameraPermissionsAsync();
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
-        await loadSound();
-        await ensureDirectoryExists();
-        await loadCategories();
-      } catch (error) {
-        console.error('Add item init failed:', error);
-        setHasPermission((current) => (current === null ? false : current));
-      }
-    })();
-
-    return () => {
-      if (soundRef.current) {
-        soundRef.current.unloadAsync();
-      }
-    };
-  }, []);
-
-  const loadCategories = async () => {
-    try {
-      const storedCategories = await storageService.getCategories();
-      setCategories(storedCategories);
-    } catch (error) {
-      console.error('Error loading categories:', error);
-    }
-  };
-
-  const ensureDirectoryExists = async () => {
-    const directory = FileSystem.documentDirectory + 'product_images/';
-    const dirInfo = await FileSystem.getInfoAsync(directory);
-    if (!dirInfo.exists) {
-      await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
-    }
-    return directory;
-  };
-
-  const loadSound = async () => {
-    try {
-      const { sound } = await Audio.Sound.createAsync(require('../assets/BEEP_SOUND.mp3'));
-      soundRef.current = sound;
-    } catch (error) {
-      console.error('Error loading sound:', error);
-    }
-  };
-
-  const playSound = async () => {
-    try {
-      if (soundRef.current) {
-        await soundRef.current.replayAsync();
-      }
-    } catch (error) {
-      console.error('Error playing sound:', error);
-    }
-  };
-
-  const checkRemovedBarcode = async (barcode: string): Promise<boolean> => {
-    try {
-      const removedBarcodes = await storageService.getRemovedBarcodes();
-      return removedBarcodes.includes(barcode);
-    } catch (error) {
-      console.error('Error checking removed barcodes:', error);
-      return false;
-    }
-  };
-
-  const removeFromRemovedBarcodes = async (barcode: string) => {
-    try {
-      const removedBarcodes = await storageService.getRemovedBarcodes();
-      const updatedList = removedBarcodes.filter((code) => code !== barcode);
-      await storageService.saveRemovedBarcodes(updatedList);
-    } catch (error) {
-      console.error('Error updating removed barcodes list:', error);
-    }
-  };
-
-  const findExistingItem = async (barcode: string): Promise<Item | null> => {
-    try {
-      const inventory = await storageService.getInventory();
-      return inventory.find((item) => item.barcode === barcode) || null;
-    } catch (error) {
-      console.error('Error finding existing item:', error);
-      return null;
-    }
-  };
-
-  const handleBarCodeScanned = async (result: BarcodeScanningResult) => {
-    if (processingRef.current || scanned || showBarcodeInput) {
-      return;
-    }
-    processingRef.current = true;
-
-    const classification = classifyBarcode(result.data);
-    if (classification.suspicious) {
-      // Release the lock so the confirm dialog (which covers the camera) doesn't
-      // leave the scanner permanently stuck if the user chooses to rescan.
-      processingRef.current = false;
-      const proceed = await dialog.confirm({
-        title: 'Unusual barcode',
-        message: `${classification.reason ?? 'This code looks unusual'}. Use "${classification.digits || result.data}" anyway?`,
-        confirmText: 'Use anyway',
-        cancelText: 'Rescan',
-      });
-      if (!proceed) {
-        return;
-      }
-      processingRef.current = true;
-    }
-
-    setScanned(true);
-    await processScannedBarcode(classification.digits || result.data.trim());
-  };
-
-  const processScannedBarcode = async (barcode: string) => {
-    await playSound();
-    setExistingProduct(false);
-
-    const wasRemoved = await checkRemovedBarcode(barcode);
-
-    if (!wasRemoved) {
-      const existingItem = await findExistingItem(barcode);
-      if (existingItem) {
-        setItemName(existingItem.name);
-        setPrice(existingItem.price.toString());
-        setQuantity('1');
-        setSelectedCategory(existingItem.category || '');
-        setExistingProduct(true);
-        toast.showToast({
-          message: `"${existingItem.name}" exists — new quantity will be added`,
-          variant: 'info',
-          duration: 3200,
-        });
-      } else {
-        setItemName('');
-        setPrice('');
-        setQuantity('1');
-        setSelectedCategory('');
-      }
-    } else {
-      setItemName('');
-      setPrice('');
-      setQuantity('1');
-      setSelectedCategory('');
-    }
-
-    setScannedItem({ barcode, name: '', quantity: 1, price: 0, category: selectedCategory });
-    setProductImage(null);
-  };
-
-  const captureProductImage = async () => {
-    try {
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 0.8,
-      });
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        setProductImage(await compressImage(result.assets[0].uri));
-      }
-    } catch (error) {
-      console.error('Error capturing image:', error);
-      void dialog.alert({ title: 'Camera error', message: 'Failed to capture image.' });
-    }
-  };
-
-  const pickProductImage = async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 0.8,
-      });
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        setProductImage(await compressImage(result.assets[0].uri));
-      }
-    } catch (error) {
-      console.error('Error picking image:', error);
-      void dialog.alert({ title: 'Image error', message: 'Failed to select image.' });
-    }
-  };
-
-  const compressImage = async (uri: string): Promise<string> => {
-    try {
-      const result = await ImageManipulator.manipulateAsync(uri, [{ resize: { width: 800 } }], {
-        compress: 0.7,
-        format: ImageManipulator.SaveFormat.JPEG,
-      });
-      return result.uri;
-    } catch (error) {
-      console.error('Error compressing image:', error);
-      return uri;
-    }
-  };
-
-  const saveImageToStorage = async (barcode: string, imageUri: string): Promise<string> => {
-    try {
-      const fileName = `product_${barcode}.jpg`;
-      const directory = await ensureDirectoryExists();
-      const newUri = directory + fileName;
-      const fileInfo = await FileSystem.getInfoAsync(newUri);
-      if (fileInfo.exists) {
-        await FileSystem.deleteAsync(newUri, { idempotent: true });
-      }
-      await FileSystem.copyAsync({ from: imageUri, to: newUri });
-      return newUri;
-    } catch (error) {
-      console.error('Error saving image:', error);
-      return imageUri;
-    }
-  };
-
-  const addItemToInventory = async () => {
-    if (!scannedItem) return;
-
-    if (!itemName.trim()) {
-      void dialog.alert({ title: 'Name required', message: 'Please enter a product name.' });
-      return;
-    }
-
-    const quantityNum = parseInt(quantity, 10);
-    const priceNum = parseFloat(price);
-
-    if (isNaN(quantityNum) || quantityNum <= 0) {
-      void dialog.alert({ title: 'Invalid quantity', message: 'Please enter a valid quantity.' });
-      return;
-    }
-
-    if (isNaN(priceNum) || priceNum <= 0) {
-      void dialog.alert({ title: 'Invalid price', message: 'Please enter a valid price.' });
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      const wasRemoved = await checkRemovedBarcode(scannedItem.barcode);
-
-      let savedImageUri: string | undefined;
-      if (productImage) {
-        savedImageUri = await saveImageToStorage(scannedItem.barcode, productImage);
-      }
-
-      const inventory: Item[] = await storageService.getInventory();
-
-      // Warn if a product with the same name but a different barcode already
-      // exists (a common source of accidental duplicate SKUs from misreads).
-      const barcodeExists = inventory.some((i) => i.barcode === scannedItem.barcode);
-      if (!barcodeExists) {
-        const trimmedName = normalizeName(itemName);
-        const similar = inventory.find(
-          (i) => normalizeName(i.name) === trimmedName && i.barcode !== scannedItem.barcode
-        );
-        if (similar) {
-          const proceed = await dialog.confirm({
-            title: 'Similar product exists',
-            message: `"${similar.name}" already exists with a different barcode (${similar.barcode}). Add this as a separate product?`,
-            confirmText: 'Add anyway',
-            cancelText: 'Cancel',
-          });
-          if (!proceed) {
-            setLoading(false);
-            return;
-          }
-        }
-      }
-
-      const itemToAdd: Item = {
-        ...scannedItem,
-        name: itemName.trim(),
-        price: priceNum,
-        quantity: quantityNum,
-        category: selectedCategory,
-        imageUri: savedImageUri,
-      };
-
-      if (wasRemoved) {
-        await removeFromRemovedBarcodes(scannedItem.barcode);
-        inventory.push(itemToAdd);
-        await storageService.saveInventory(inventory);
-        toast.showToast({ message: 'Product added', variant: 'success' });
-      } else {
-        const existingItemIndex = inventory.findIndex((i) => i.barcode === itemToAdd.barcode);
-        if (existingItemIndex !== -1) {
-          inventory[existingItemIndex] = {
-            ...inventory[existingItemIndex],
-            name: itemToAdd.name,
-            quantity: inventory[existingItemIndex].quantity + itemToAdd.quantity,
-            price: itemToAdd.price,
-            category: itemToAdd.category,
-          };
-          if (savedImageUri) {
-            inventory[existingItemIndex].imageUri = savedImageUri;
-          }
-          await storageService.saveInventory(inventory);
-          toast.showToast({ message: 'Product quantity updated', variant: 'success' });
-        } else {
-          inventory.push(itemToAdd);
-          await storageService.saveInventory(inventory);
-          toast.showToast({ message: 'Product added', variant: 'success' });
-        }
-      }
-
-      resetForm();
-    } catch (error) {
-      console.error('Error saving item:', error);
-      void dialog.alert({ title: 'Save failed', message: 'Failed to add product to inventory.' });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const resetForm = () => {
-    setScannedItem(null);
-    setScanned(false);
-    processingRef.current = false;
-    setProductImage(null);
-    setExistingProduct(false);
-    setItemName('');
-    setPrice('');
-    setQuantity('1');
-    setSelectedCategory('');
-  };
-
-  if (hasPermission === null) {
-    return (
-      <View style={styles.permissionContainer}>
-        <ActivityIndicator color={theme.primary} size="large" />
-        <Text style={styles.permissionText}>Requesting camera permission…</Text>
-      </View>
-    );
-  }
-
-  const scanningActive = !scanned && !showBarcodeInput;
-
-  return (
-    <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
-      <KeyboardAvoidingView
-        style={styles.keyboardAvoidingContainer}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={100}
-      >
-        {!scanned ? (
-          <View style={styles.scanContainer}>
-            <Text style={styles.scanHint}>Point the camera at the product barcode</Text>
-
-            <View style={styles.cameraFrame}>
-              {hasPermission ? (
-                <CameraView
-                  style={StyleSheet.absoluteFill}
-                  facing="back"
-                  active={scanningActive}
-                  barcodeScannerSettings={{
-                    barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e'],
-                  }}
-                  onBarcodeScanned={scanningActive ? handleBarCodeScanned : undefined}
-                />
-              ) : (
-                <View style={styles.noCamera}>
-                  <Ionicons name="camera-outline" size={40} color={theme.textSecondary} />
-                  <Text style={styles.permissionText}>Camera unavailable</Text>
-                </View>
-              )}
-              <View style={styles.reticle} pointerEvents="none" />
-            </View>
-
-            <TouchableOpacity
-              style={[styles.manualButton, { marginBottom: Math.max(insets.bottom, 12) + 8 }]}
-              onPress={() => setShowBarcodeInput(true)}
-            >
-              <Ionicons name="keypad-outline" size={18} color={theme.primary} />
-              <Text style={styles.manualButtonText}>Enter barcode manually</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <ScrollView
-            style={styles.formContainer}
-            contentContainerStyle={[styles.formContent, { paddingBottom: Math.max(insets.bottom, 16) + 24 }]}
-            keyboardShouldPersistTaps="handled"
-          >
-            {scannedItem && (
-              <>
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionHeaderText}>Product information</Text>
-                  <Text style={styles.barcodeText}>Barcode: {scannedItem.barcode}</Text>
-                </View>
-
-                {existingProduct && (
-                  <View style={styles.existingProductBanner}>
-                    <Ionicons name="information-circle" size={20} color="#ffffff" />
-                    <Text style={styles.existingProductText}>Existing product — quantity will be added</Text>
-                  </View>
-                )}
-
-                <View style={styles.imageSection}>
-                  <TouchableOpacity style={styles.imageButton} onPress={pickProductImage} onLongPress={captureProductImage}>
-                    {productImage ? (
-                      <Image source={{ uri: productImage }} style={styles.productImage} />
-                    ) : (
-                      <View style={styles.imagePlaceholder}>
-                        <FontAwesome5 name="camera" size={28} color={theme.textSecondary} />
-                        <Text style={styles.imagePlaceholderText}>{existingProduct ? 'Update image' : 'Add image'}</Text>
-                        <Text style={styles.imagePlaceholderHint}>Tap to choose · hold to shoot</Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                </View>
-
-                <View style={styles.formGroup}>
-                  <Text style={styles.label}>Product name *</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={itemName}
-                    onChangeText={setItemName}
-                    placeholder="Enter product name"
-                    placeholderTextColor={theme.placeholder}
-                  />
-                </View>
-
-                <View style={styles.row}>
-                  <View style={[styles.formGroup, styles.halfWidth]}>
-                    <Text style={styles.label}>Price (Rs.) *</Text>
-                    <TextInput
-                      style={styles.input}
-                      value={price}
-                      onChangeText={setPrice}
-                      keyboardType="decimal-pad"
-                      placeholder="0.00"
-                      placeholderTextColor={theme.placeholder}
-                    />
-                  </View>
-                  <View style={[styles.formGroup, styles.halfWidth]}>
-                    <Text style={styles.label}>Quantity *</Text>
-                    <TextInput
-                      style={styles.input}
-                      value={quantity}
-                      onChangeText={setQuantity}
-                      keyboardType="number-pad"
-                      placeholder="1"
-                      placeholderTextColor={theme.placeholder}
-                    />
-                  </View>
-                </View>
-
-                {categories.length > 0 && (
-                  <View style={styles.formGroup}>
-                    <Text style={styles.label}>Category</Text>
-                    <View style={styles.categoryContainer}>
-                      {categories.map((category) => (
-                        <TouchableOpacity
-                          key={category}
-                          style={[styles.categoryButton, selectedCategory === category && styles.selectedCategoryButton]}
-                          onPress={() => setSelectedCategory(category)}
-                        >
-                          <Text
-                            style={[
-                              styles.categoryButtonText,
-                              selectedCategory === category && styles.selectedCategoryButtonText,
-                            ]}
-                          >
-                            {category}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </View>
-                )}
-
-                <View style={styles.buttonGroup}>
-                  <TouchableOpacity style={styles.secondaryButton} onPress={resetForm}>
-                    <Text style={styles.secondaryButtonText}>Scan again</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.primaryButton} onPress={addItemToInventory} disabled={loading}>
-                    {loading ? (
-                      <ActivityIndicator color="#fff" />
-                    ) : (
-                      <Text style={styles.primaryButtonText}>{existingProduct ? 'Update inventory' : 'Add to inventory'}</Text>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </>
-            )}
-          </ScrollView>
-        )}
-      </KeyboardAvoidingView>
-
-      <BarcodeInputModal
-        visible={showBarcodeInput}
-        onClose={() => setShowBarcodeInput(false)}
-        onSubmit={(barcode) => {
-          setShowBarcodeInput(false);
-          setScanned(true);
-          processingRef.current = true;
-          void processScannedBarcode(barcode);
-        }}
-        theme={theme}
-      />
-    </SafeAreaView>
-  );
-};
-
-const createStyles = (theme: Theme) =>
-  StyleSheet.create({
-    container: { flex: 1, backgroundColor: theme.background },
-    permissionContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      padding: 20,
-      backgroundColor: theme.background,
-    },
-    permissionText: { color: theme.textSecondary, marginTop: 12, fontSize: 15 },
-    keyboardAvoidingContainer: { flex: 1 },
-    scanContainer: { flex: 1, alignItems: 'center', paddingTop: 24, paddingHorizontal: 20 },
-    scanHint: { color: theme.textSecondary, fontSize: 14, marginBottom: 16, textAlign: 'center' },
-    cameraFrame: {
-      width: '86%',
-      aspectRatio: 1,
-      maxWidth: 320,
-      borderRadius: 18,
-      overflow: 'hidden',
-      backgroundColor: '#000000',
-    },
-    noCamera: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
-    reticle: {
-      position: 'absolute',
-      top: '18%',
-      left: '12%',
-      right: '12%',
-      bottom: '18%',
-      borderWidth: 2,
-      borderColor: 'rgba(255,255,255,0.85)',
-      borderRadius: 12,
-    },
-    manualButton: {
-      marginTop: 'auto',
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-      paddingVertical: 14,
-      paddingHorizontal: 20,
-      borderRadius: 10,
-      borderWidth: 1,
-      borderColor: theme.divider,
-      backgroundColor: theme.cardBackground,
-    },
-    manualButtonText: { color: theme.primary, fontSize: 15, fontWeight: '800' },
-    formContainer: { flex: 1 },
-    formContent: { padding: 20 },
-    sectionHeader: { marginBottom: 18 },
-    sectionHeaderText: { fontSize: 17, fontWeight: 'bold', color: theme.text },
-    barcodeText: { fontSize: 14, color: theme.textSecondary, marginTop: 4 },
-    existingProductBanner: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: theme.mode === 'dark' ? '#78350f' : '#f59e0b',
-      padding: 10,
-      borderRadius: 8,
-      marginBottom: 18,
-      gap: 8,
-    },
-    existingProductText: { color: '#ffffff', fontSize: 13, flex: 1 },
-    imageSection: { alignItems: 'center', marginBottom: 20 },
-    imageButton: {
-      width: 160,
-      height: 160,
-      justifyContent: 'center',
-      alignItems: 'center',
-      backgroundColor: theme.cardBackground,
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: theme.divider,
-      overflow: 'hidden',
-    },
-    productImage: { width: '100%', height: '100%' },
-    imagePlaceholder: { justifyContent: 'center', alignItems: 'center', padding: 16 },
-    imagePlaceholderText: { marginTop: 10, color: theme.text, fontWeight: '700', textAlign: 'center' },
-    imagePlaceholderHint: { marginTop: 4, color: theme.textSecondary, fontSize: 12, textAlign: 'center' },
-    formGroup: { marginBottom: 18 },
-    label: { fontSize: 14, fontWeight: 'bold', marginBottom: 8, color: theme.text },
-    input: {
-      backgroundColor: theme.cardBackground,
-      padding: 14,
-      borderRadius: 8,
-      fontSize: 16,
-      color: theme.text,
-      borderWidth: 1,
-      borderColor: theme.divider,
-    },
-    row: { flexDirection: 'row', justifyContent: 'space-between' },
-    halfWidth: { width: '48%' },
-    categoryContainer: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 4, gap: 8 },
-    categoryButton: {
-      paddingVertical: 8,
-      paddingHorizontal: 14,
-      borderRadius: 20,
-      backgroundColor: theme.cardBackground,
-      borderWidth: 1,
-      borderColor: theme.divider,
-    },
-    selectedCategoryButton: { backgroundColor: theme.primary, borderColor: theme.primary },
-    categoryButtonText: { color: theme.text },
-    selectedCategoryButtonText: { color: '#ffffff' },
-    buttonGroup: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 24, gap: 12 },
-    primaryButton: {
-      flex: 1,
-      backgroundColor: theme.primary,
-      padding: 15,
-      borderRadius: 10,
-      alignItems: 'center',
-    },
-    primaryButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-    secondaryButton: {
-      flex: 1,
-      backgroundColor: theme.cardBackground,
-      padding: 15,
-      borderRadius: 10,
-      alignItems: 'center',
-      borderWidth: 1,
-      borderColor: theme.divider,
-    },
-    secondaryButtonText: { color: theme.text, fontSize: 16, fontWeight: 'bold' },
+  const [form, setForm] = useState({
+    barcode: "",
+    name: "",
+    quantity: "0",
+    price: "",
+    category: "",
+    unit: "piece",
+    cost: "",
+    threshold: "",
+    imageUri: null as string | null,
   });
 
-export default AddItemScreen;
+  const { busy, error, run, setError } = useAction();
+  const { confirm } = useDialog();
+  const { showToast } = useToast();
+
+  const change = (key: keyof typeof form, value: string | null) => {
+    setForm((f) => ({ ...f, [key]: value }));
+    setInvalid((list) => list.filter((k) => k !== key));
+  };
+
+  /**
+   * One red line directly above Save, shown for three seconds. It sits in the
+   * sticky footer so it is visible with the keyboard up, unlike the notice at
+   * the top of the form, and it always names the reason in plain words.
+   */
+  const flash = useCallback((message: string) => {
+    if (!mounted.current) return;
+    setStatus(message);
+    if (statusTimer.current) clearTimeout(statusTimer.current);
+    statusTimer.current = setTimeout(() => mounted.current && setStatus(null), STATUS_MS);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    if (productId)
+      getProductById(productId)
+        .then((p) => {
+          if (!active) return;
+          if (!p) throw new Error("Product unavailable");
+          setOriginal(p);
+          setForm({
+            barcode: p.barcode,
+            name: p.name,
+            quantity: String(p.stockQuantity),
+            price: String(p.priceCents / 100),
+            category: p.categoryName ?? "",
+            unit: p.unit,
+            cost: p.costCents == null ? "" : String(p.costCents / 100),
+            threshold: String(p.lowStockThreshold),
+            imageUri: p.imageUri ?? null,
+          });
+          if (p.costCents != null) setDetails(true);
+        })
+        .catch((e) => {
+          if (active) setLoadError(e.message);
+        })
+        .finally(() => {
+          if (active) setLoading(false);
+        });
+    return () => {
+      active = false;
+    };
+  }, [productId]);
+
+  // Photos taken in this session but never saved are removed when leaving.
+  useEffect(
+    () => () => {
+      mounted.current = false;
+      if (statusTimer.current) clearTimeout(statusTimer.current);
+      for (const uri of newPhotos.current) void removeProductPhoto(uri);
+    },
+    [],
+  );
+
+  /** A barcode that is already in stock opens that product instead of failing on save. */
+  const checkExisting = useCallback(
+    async (code: string, viaScanner: boolean) => {
+      const trimmed = code.trim();
+      if (!trimmed) {
+        setExisting(null);
+        return;
+      }
+      const found = await getProductByBarcode(trimmed).catch(() => null);
+      if (found && found.id !== productId) {
+        if (viaScanner && !productId) {
+          showToast({
+            message: `${found.name} is already in stock`,
+            detail: "Opening it for editing.",
+            variant: "info",
+          });
+          navigation.replace("AddItem", { productId: found.id });
+          return;
+        }
+        setExisting(found);
+      } else setExisting(null);
+    },
+    [navigation, productId, showToast],
+  );
+
+  // Typed or pasted codes are checked shortly after typing stops.
+  useEffect(() => {
+    const code = form.barcode.trim();
+    if (code.length < 6) {
+      setExisting(null);
+      return;
+    }
+    const timer = setTimeout(() => void checkExisting(code, false), 500);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.barcode]);
+
+  /** Photo processing has its own busy state so it can never swallow a Save tap. */
+  const photo = async (camera = false) => {
+    if (photoBusy) return;
+    setPhotoBusy(true);
+    setError(null);
+    try {
+      if (camera && !(await ImagePicker.requestCameraPermissionsAsync()).granted)
+        throw new Error("Camera access is needed to take a product photo.");
+      const result = await (camera
+        ? ImagePicker.launchCameraAsync
+        : ImagePicker.launchImageLibraryAsync)({
+        mediaTypes: ["images"],
+        // The platform crop screen is unreliable on several Android OEMs; we resize ourselves.
+        allowsEditing: false,
+        quality: 0.6,
+        exif: false,
+      });
+      if (result.canceled) return;
+      const asset = result.assets[0];
+      const uri = await storeProductPhoto(asset.uri, asset.width, asset.height);
+      // The user may have saved and left while the camera was open.
+      if (!mounted.current) {
+        void removeProductPhoto(uri);
+        return;
+      }
+      newPhotos.current.push(uri);
+      change("imageUri", uri);
+    } catch (e) {
+      if (mounted.current) {
+        setError((e as Error).message);
+        flash((e as Error).message);
+      }
+    } finally {
+      if (mounted.current) setPhotoBusy(false);
+    }
+  };
+
+  const missing = REQUIRED.filter((key) => !form[key].trim());
+  const canSave = missing.length === 0 && !photoBusy;
+
+  /** A tap on the light-blue (disabled) Save says what is still needed. */
+  const explain = () => {
+    if (photoBusy) {
+      flash("Photo is still being prepared. Save unlocks in a moment.");
+      return;
+    }
+    setInvalid(missing);
+    screen.current?.scrollToTop();
+    const names = missing.map((k) => FIELD_LABEL[k]).join(", ");
+    flash(`Fill ${names} to save this product.`);
+    showToast({ message: "Fill the highlighted fields", detail: names, variant: "error" });
+  };
+
+  /** Turns the text fields into a repository input, naming the first bad row. */
+  const readForm = () => {
+    const money = (text: string, field: Field | null, label: string) => {
+      try {
+        return toCents(text) / 100;
+      } catch {
+        throw new FieldError(field, `${label} "${text.trim()}" is not a number. Use digits, e.g. 45 or 45.50.`);
+      }
+    };
+    const count = (text: string, field: Field | null, label: string) => {
+      const value = Number(text);
+      if (!text.trim() || !Number.isFinite(value))
+        throw new FieldError(field, `${label} "${text.trim()}" is not a number.`);
+      return value;
+    };
+    return {
+      barcode: form.barcode.trim() || generateInStoreBarcode(),
+      name: form.name,
+      quantity: count(form.quantity, "quantity", "In stock"),
+      price: money(form.price, "price", "Price"),
+      category: form.category,
+      unit: form.unit,
+      costPrice: form.cost.trim() ? money(form.cost, null, "Buying cost") : null,
+      lowStockThreshold: form.threshold.trim() ? count(form.threshold, null, "Alert below") : 5,
+      imageUri: form.imageUri,
+      stockReason: "Inventory count corrected in product editor",
+      expectedVersion: original?.version,
+    };
+  };
+
+  const save = () => {
+    if (!canSave) {
+      explain();
+      return;
+    }
+    void run(async () => {
+      // If SQLite is held by something else (a backup, a big import) say so instead of spinning silently.
+      const slow = setTimeout(() => flash("Still saving… the database is busy. Give it a moment."), SLOW_SAVE_MS);
+      try {
+        const input = readForm();
+        if (productId) await updateProduct(productId, input);
+        else await createProduct(input);
+      } catch (e) {
+        const message = (e as Error).message;
+        const field = e instanceof FieldError ? e.field : fieldFor(message);
+        if (field) setInvalid([field]);
+        screen.current?.scrollToTop();
+        flash(message);
+        showToast({ message: "Could not save", detail: message, variant: "error", duration: 3500 });
+        throw e;
+      } finally {
+        clearTimeout(slow);
+      }
+      // Saved photos now belong to the product; a replaced photo is removed.
+      newPhotos.current = newPhotos.current.filter((u) => u !== form.imageUri);
+      if (original?.imageUri && original.imageUri !== form.imageUri) void removeProductPhoto(original.imageUri);
+      notifyDataChanged();
+      showToast({ message: productId ? "Product updated" : "Product added", variant: "success" });
+      navigation.goBack();
+    });
+  };
+
+  const symbol = currency.symbol.trim();
+  const has = (key: Field) => invalid.includes(key);
+  const unitLabel = <AppText style={{ color: theme.textSecondary, fontSize: 14 }}>{form.unit}</AppText>;
+  const symbolLabel = <AppText style={{ color: theme.textSecondary, fontSize: 14 }}>{symbol}</AppText>;
+
+  return (
+    <AppScreen
+      ref={screen}
+      theme={theme}
+      keyboardAware
+      footer={
+        !loading &&
+        !loadError && (
+          <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12, gap: 8 }}>
+            {status && (
+              <View
+                accessibilityLiveRegion="polite"
+                style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 2 }}
+              >
+                <Ionicons name="alert-circle" size={15} color={theme.danger} />
+                <AppText numberOfLines={2} style={{ flex: 1, color: theme.danger, fontSize: 12, fontWeight: "500" }}>
+                  {status}
+                </AppText>
+              </View>
+            )}
+            <AppButton
+              theme={theme}
+              label="Save product"
+              onPress={save}
+              loading={busy}
+              disabled={!canSave}
+              onDisabledPress={explain}
+            />
+          </View>
+        )
+      }
+    >
+      {loading ? (
+        <Busy />
+      ) : loadError ? (
+        <Notice message={loadError} error />
+      ) : (
+        <>
+          <Notice message={error} error />
+          <View style={{ alignItems: "center", marginBottom: 14, gap: 8 }}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={form.imageUri ? "Change product photo" : "Add product photo (optional)"}
+              onPress={() => photo(true)}
+              disabled={photoBusy}
+              style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+            >
+              {form.imageUri ? (
+                <Image
+                  source={{ uri: form.imageUri }}
+                  style={{ width: 96, height: 96, borderRadius: 22, backgroundColor: theme.inputBackground }}
+                  accessibilityLabel="Product photo"
+                />
+              ) : (
+                <View
+                  style={{
+                    width: 96,
+                    height: 96,
+                    borderRadius: 22,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor: theme.cardBackground,
+                    borderWidth: 1,
+                    borderColor: theme.divider,
+                    borderStyle: "dashed",
+                  }}
+                >
+                  {photoBusy ? (
+                    <ActivityIndicator color={theme.primary} />
+                  ) : (
+                    <Ionicons name="camera" size={28} color={theme.primary} />
+                  )}
+                </View>
+              )}
+            </Pressable>
+            <View style={{ flexDirection: "row", gap: 14 }}>
+              <Pressable accessibilityRole="button" onPress={() => photo(true)} disabled={photoBusy} hitSlop={6}>
+                <AppText style={{ color: theme.primary, fontSize: 13, fontWeight: "600" }}>
+                  {form.imageUri ? "Retake" : "Take photo"}
+                </AppText>
+              </Pressable>
+              <Pressable accessibilityRole="button" onPress={() => photo()} disabled={photoBusy} hitSlop={6}>
+                <AppText style={{ color: theme.primary, fontSize: 13, fontWeight: "600" }}>Gallery</AppText>
+              </Pressable>
+              {form.imageUri && (
+                <Pressable accessibilityRole="button" onPress={() => change("imageUri", null)} hitSlop={6}>
+                  <AppText style={{ color: theme.danger, fontSize: 13, fontWeight: "600" }}>Remove</AppText>
+                </Pressable>
+              )}
+            </View>
+            <AppText style={{ color: photoBusy ? theme.primary : theme.placeholder, fontSize: 11 }}>
+              {photoBusy ? "Processing photo… you can keep filling the form" : "Photo is optional"}
+            </AppText>
+          </View>
+          <Group title="Product" footer={invalid.length ? "Fields marked * are required." : undefined}>
+            <FormRow
+              label="Name"
+              required
+              invalid={has("name")}
+              value={form.name}
+              onChangeText={(v) => change("name", v)}
+              placeholder="Basmati rice"
+              autoCapitalize="sentences"
+              returnKeyType="next"
+            />
+            <FormRow
+              label="Price"
+              required
+              invalid={has("price")}
+              value={form.price}
+              onChangeText={(v) => change("price", v.replace(",", "."))}
+              keyboardType="decimal-pad"
+              placeholder="0.00"
+              trailing={symbolLabel}
+            />
+            <FormRow
+              label="In stock"
+              required
+              invalid={has("quantity")}
+              value={form.quantity}
+              onChangeText={(v) => change("quantity", v.replace(",", "."))}
+              keyboardType="decimal-pad"
+              selectTextOnFocus
+              trailing={unitLabel}
+            />
+            <SelectField
+              label="Sold by"
+              value={form.unit}
+              options={PRODUCT_UNITS.map((v) => ({ value: v, label: v === "piece" ? "Piece" : v }))}
+              onChange={(v) => change("unit", v)}
+            />
+            <FormRow
+              label="Category"
+              value={form.category}
+              onChangeText={(v) => change("category", v)}
+              placeholder="Optional"
+              autoCapitalize="words"
+            />
+          </Group>
+          <Group
+            title="Barcode"
+            footer={
+              existing
+                ? undefined
+                : "Optional. Leave blank and an in-store EAN-13 (starting 20) is generated for a sticker."
+            }
+          >
+            <FormRow
+              label="Code"
+              invalid={has("barcode")}
+              value={form.barcode}
+              onChangeText={(v) => change("barcode", v)}
+              autoCapitalize="none"
+              maxLength={128}
+              placeholder="Optional"
+              trailing={
+                <ProductScanner
+                  compact
+                  label="Scan"
+                  onScan={async (code) => {
+                    change("barcode", code);
+                    await checkExisting(code, true);
+                  }}
+                />
+              }
+            />
+            {existing && (
+              <ListRow
+                icon="alert-circle"
+                iconColor="#ff9500"
+                title={`Already in stock: ${existing.name}`}
+                subtitle="Tap to edit that product instead"
+                onPress={() => navigation.replace("AddItem", { productId: existing.id })}
+              />
+            )}
+          </Group>
+          <Group
+            title="More"
+            footer={
+              details
+                ? "Buying cost is what you pay per unit; it is only used for profit reports. Low-stock alert defaults to 5."
+                : undefined
+            }
+          >
+            <ListRow
+              title="Buying cost & low-stock alert"
+              subtitle="Optional"
+              onPress={() => setDetails(!details)}
+              chevron={false}
+              right={<Ionicons name={details ? "chevron-up" : "chevron-down"} size={18} color={theme.placeholder} />}
+            />
+            {details && (
+              <FormRow
+                label="Buying cost"
+                value={form.cost}
+                onChangeText={(v) => change("cost", v.replace(",", "."))}
+                keyboardType="decimal-pad"
+                placeholder="Optional"
+                trailing={symbolLabel}
+              />
+            )}
+            {details && (
+              <FormRow
+                label="Alert below"
+                value={form.threshold}
+                onChangeText={(v) => change("threshold", v.replace(",", "."))}
+                keyboardType="decimal-pad"
+                placeholder="5"
+                trailing={unitLabel}
+              />
+            )}
+          </Group>
+          {productId && (
+            <Group>
+              <ListRow
+                title="Archive product"
+                destructive
+                chevron={false}
+                onPress={() =>
+                  run(async () => {
+                    if (
+                      await confirm({
+                        title: "Archive product?",
+                        message:
+                          "It leaves the active catalog. Stock and history stay, and you can restore it from the Archived filter.",
+                        confirmText: "Archive",
+                        destructive: true,
+                      })
+                    ) {
+                      await softDeleteProduct(productId);
+                      notifyDataChanged();
+                      navigation.goBack();
+                    }
+                  })
+                }
+              />
+            </Group>
+          )}
+        </>
+      )}
+    </AppScreen>
+  );
+}

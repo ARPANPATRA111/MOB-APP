@@ -1,6 +1,7 @@
+import { AppText as Text } from '../src/contexts/TypographyContext';
 import React, { useCallback, useEffect, useState } from 'react';
-import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import type { AppNavigation } from '../App';
 import { useTheme, type Theme } from '../src/contexts/ThemeContext';
 import { storageService } from '../src/services/storage';
