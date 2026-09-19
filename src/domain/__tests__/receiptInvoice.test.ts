@@ -51,4 +51,24 @@ describe('official invoice formatting', () => {
     expect(html).toContain('Grand Total');
     expect(html).toContain('Premium Atta 10kg');
   });
+
+  it('marks the shop address and phone with inline icons that never depend on emoji fonts', () => {
+    const html = createReceiptHtml(
+      formatReceiptData(sale, {
+        id: 'business-1',
+        businessName: 'MOPX Store',
+        phone: '9999999999',
+        address: 'Main Road',
+        currencyCode: 'INR',
+      }),
+    );
+    const address = html.indexOf('Main Road');
+    const phone = html.indexOf('9999999999');
+    expect(address).toBeGreaterThan(-1);
+    expect(phone).toBeGreaterThan(-1);
+    // Each detail is preceded by its own <svg> glyph on the same line.
+    expect(html.slice(html.lastIndexOf('<svg', address), address)).toContain('</svg>');
+    expect(html.slice(html.lastIndexOf('<svg', phone), phone)).toContain('</svg>');
+    expect(html).not.toMatch(/[\u{1F4CD}\u{260E}]/u);
+  });
 });

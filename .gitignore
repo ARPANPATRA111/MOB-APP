@@ -58,3 +58,8 @@ keystore.properties
 credentials.json
 
 Making some changes to the project report today
+# Generated local module and verification artifacts
+modules/**/android/build/
+modules/**/android/.gradle/
+output/
+.codex-tmp/

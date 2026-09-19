@@ -106,3 +106,31 @@ export const classifyBarcode = (raw: string): BarcodeClassification => {
 
   return { raw: trimmed, digits, canonical, isRetailLength, checksumValid, suspicious, reason };
 };
+
+/**
+ * In-store numbers for products that have no manufacturer barcode.
+ *
+ * GS1 reserves EAN-13 numbers starting 02 and 20–29 as Restricted Circulation
+ * Numbers for use inside one company or shop; they can never clash with a real
+ * product, and they print as ordinary EAN-13 stickers any scanner understands.
+ */
+
+/** GS1 modulo-10 check digit for the first 12 digits of an EAN-13. */
+export const ean13CheckDigit = (twelve: string): number => {
+  if (!/^\d{12}$/.test(twelve)) throw new Error('Expected 12 digits');
+  return computeCheckDigit(twelve);
+};
+
+/** True for GS1 in-store / variable-measure numbers (EAN-13 starting 02 or 20–29). */
+export const isInStoreCode = (code: string): boolean =>
+  /^\d{13}$/.test(code) && (code.startsWith('02') || /^2[0-9]/.test(code));
+
+/**
+ * New in-store EAN-13: `20` + 10 random digits + check digit. Callers should
+ * still check the catalog for a clash before saving (the odds are 1 in 10¹⁰).
+ */
+export const generateInStoreBarcode = (random: () => number = Math.random): string => {
+  let body = '20';
+  while (body.length < 12) body += Math.floor(random() * 10);
+  return body + ean13CheckDigit(body);
+};

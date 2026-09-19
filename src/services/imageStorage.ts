@@ -36,8 +36,11 @@ export const cleanupOrphanImages = async (
   const dryRun = options.dryRun ?? false;
   const dir = await ensureImageDir();
 
+  // A referenced photo keeps its list thumbnail (`<name>.thumb.jpg`) alive too.
   const referenced = new Set(
-    referencedUris.filter((uri): uri is string => Boolean(uri) && isAppOwned(uri as string))
+    referencedUris
+      .filter((uri): uri is string => Boolean(uri) && isAppOwned(uri as string))
+      .flatMap((uri) => [uri, uri.endsWith('.jpg') ? uri.slice(0, -4) + '.thumb.jpg' : uri + '.thumb.jpg'])
   );
 
   let names: string[] = [];
@@ -50,7 +53,9 @@ export const cleanupOrphanImages = async (
   const orphans: string[] = [];
   for (const name of names) {
     const fullUri = `${dir}${name}`;
-    if (!referenced.has(fullUri)) {
+    const info=await FileSystem.getInfoAsync(fullUri);
+    // Restored images live in subdirectories. Never delete an entire directory as an orphan.
+    if (info.exists&&!info.isDirectory&&!referenced.has(fullUri)) {
       orphans.push(fullUri);
     }
   }

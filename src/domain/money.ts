@@ -1,82 +1,67 @@
+import { assertMinorUnits, quantityCostCents, validateQuantity } from './commerce';
 export interface MoneyTotals {
   subtotalCents: number;
   discountCents: number;
   taxCents: number;
   totalCents: number;
 }
-
 export interface PricedLine {
   quantity: number;
   unitPriceCents: number;
   discountCents?: number;
   taxCents?: number;
 }
-
 export const toCents = (value: number | string): number => {
-  const numericValue = typeof value === 'string' ? Number(value) : value;
-  if (!Number.isFinite(numericValue)) {
-    throw new Error('Money value must be a finite number');
-  }
-
-  return Math.round(numericValue * 100);
+  const text = String(value).trim();
+  if (!/^-?\d+(?:\.\d+)?$/.test(text) || !Number.isFinite(Number(text)))
+    throw new Error('Money value must be a finite decimal number');
+  const negative = text.startsWith('-');
+  const [whole, fraction = ''] = text.replace(/^-/, '').split('.');
+  const result = Number(
+    BigInt(whole) * 100n +
+      BigInt((fraction + '00').slice(0, 2)) +
+      (Number(fraction[2] ?? 0) >= 5 ? 1n : 0n)
+  );
+  assertMinorUnits(result);
+  return negative ? -result : result;
 };
-
-export const fromCents = (value: number): number => {
-  return Number((value / 100).toFixed(2));
-};
-
+export const fromCents = (value: number) => Number((value / 100).toFixed(2));
 export const calculateLineTotalCents = ({
   quantity,
   unitPriceCents,
   discountCents = 0,
   taxCents = 0,
 }: PricedLine): number => {
-  if (!Number.isInteger(quantity) || quantity <= 0) {
-    throw new Error('Line quantity must be a positive integer');
-  }
-
-  if (!Number.isInteger(unitPriceCents) || unitPriceCents < 0) {
-    throw new Error('Unit price must be a non-negative cent amount');
-  }
-
-  const gross = quantity * unitPriceCents;
-  const total = gross - discountCents + taxCents;
-  if (total < 0) {
-    throw new Error('Line total cannot be negative');
-  }
-
-  return total;
+  validateQuantity(quantity);
+  assertMinorUnits(unitPriceCents, 'Unit price');
+  assertMinorUnits(discountCents, 'Discount');
+  assertMinorUnits(taxCents, 'Tax');
+  const gross = quantityCostCents(quantity, unitPriceCents);
+  if (discountCents > gross) throw new Error('Discount cannot exceed item subtotal');
+  return assertMinorUnits(gross - discountCents + taxCents);
 };
-
 export const calculateTotals = (
   lines: PricedLine[],
   billDiscountCents = 0,
   taxRate = 0
 ): MoneyTotals => {
-  if (lines.length === 0) {
-    throw new Error('At least one line is required');
-  }
-
-  if (billDiscountCents < 0) {
-    throw new Error('Discount cannot be negative');
-  }
-
-  if (taxRate < 0) {
-    throw new Error('Tax rate cannot be negative');
-  }
-
+  if (!lines.length) throw new Error('At least one line is required');
+  assertMinorUnits(billDiscountCents, 'Discount');
+  if (!Number.isFinite(taxRate) || taxRate < 0 || taxRate > 1)
+    throw new Error('Tax rate must be between 0 and 100%');
   const subtotalCents = lines.reduce(
-    (sum, line) => sum + line.quantity * line.unitPriceCents - (line.discountCents ?? 0),
+    (sum, line) => sum + calculateLineTotalCents({ ...line, taxCents: 0 }),
     0
   );
-  const effectiveSubtotal = Math.max(0, subtotalCents - billDiscountCents);
-  const taxCents = Math.round(effectiveSubtotal * taxRate);
-  const totalCents = effectiveSubtotal + taxCents;
-
+  if (billDiscountCents > subtotalCents) throw new Error('Discount cannot exceed subtotal');
+  assertMinorUnits(subtotalCents,'Subtotal');
+  const rateUnits=Math.round(taxRate*100000000);
+  if(Math.abs(taxRate-rateUnits/100000000)>1e-12)throw new Error('Use at most six decimal places for the tax percentage');
+  const taxCents=Number((BigInt(subtotalCents-billDiscountCents)*BigInt(rateUnits)+50000000n)/100000000n);
   return {
     subtotalCents,
     discountCents: billDiscountCents,
     taxCents,
-    totalCents,
+    totalCents: assertMinorUnits(subtotalCents - billDiscountCents + taxCents),
   };
 };

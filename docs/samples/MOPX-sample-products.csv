@@ -1,0 +1,66 @@
+barcode,name,quantity,price,category,unit,costPrice,lowStockThreshold
+2000000000015,Basmati Rice 5 kg,24,520,Grains & Flour,pack,455,5
+2000000000022,Sona Masoori Rice 10 kg,12,680,Grains & Flour,pack,610,3
+2000000000039,Wheat Atta 5 kg,30,245,Grains & Flour,pack,218,6
+2000000000046,Toor Dal 1 kg,40,165,Pulses,pack,148,8
+2000000000053,Moong Dal 1 kg,35,140,Pulses,pack,124,8
+2000000000060,Chana Dal 1 kg,28,110,Pulses,pack,96,6
+2000000000077,Rajma 500 g,22,85,Pulses,pack,72,5
+2000000000084,Sugar 1 kg,60,46,Staples,pack,41,10
+2000000000091,Tata Salt 1 kg,75,28,Staples,pack,24,12
+2000000000107,Fortune Sunflower Oil 1 L,40,145,Oils,piece,131,8
+2000000000114,Saffola Gold Oil 1 L,18,190,Oils,piece,172,4
+2000000000121,Amul Butter 500 g,20,275,Dairy,piece,258,5
+2000000000138,Amul Cheese Slices 200 g,15,135,Dairy,piece,122,4
+2000000000145,Amul Taaza Milk 1 L,48,68,Dairy,piece,63,12
+2000000000152,Mother Dairy Curd 400 g,24,38,Dairy,piece,34,6
+2000000000169,Parle-G Biscuits 800 g,36,90,Snacks,pack,80,8
+2000000000176,Britannia Good Day 600 g,30,95,Snacks,pack,84,6
+2000000000183,Haldiram Aloo Bhujia 400 g,25,110,Snacks,pack,97,5
+2000000000190,Lay's Classic Salted 90 g,50,30,Snacks,piece,26,10
+2000000000206,Kurkure Masala Munch 90 g,45,20,Snacks,piece,17,10
+2000000000213,Maggi Noodles 12-pack,40,168,Instant Food,pack,152,8
+2000000000220,Kissan Tomato Ketchup 950 g,18,145,Sauces,piece,130,4
+2000000000237,MDH Garam Masala 100 g,30,85,Spices,piece,74,6
+2000000000244,Everest Turmeric Powder 200 g,28,62,Spices,piece,54,6
+2000000000251,Catch Red Chilli Powder 200 g,26,78,Spices,piece,68,5
+2000000000268,Tata Tea Gold 500 g,22,285,Beverages,piece,262,5
+2000000000275,Nescafe Classic 100 g,16,320,Beverages,piece,296,4
+2000000000282,Bournvita 500 g,14,245,Beverages,piece,224,3
+2000000000299,Coca-Cola 750 ml,60,45,Beverages,piece,39,12
+2000000000305,Bisleri Water 1 L,90,20,Beverages,piece,15,20
+2000000000312,Real Mixed Fruit Juice 1 L,20,115,Beverages,piece,102,4
+2000000000329,Colgate Strong Teeth 200 g,40,118,Personal Care,piece,104,8
+2000000000336,Dove Soap 100 g,55,65,Personal Care,piece,56,10
+2000000000343,Lifebuoy Soap 125 g,70,32,Personal Care,piece,27,12
+2000000000350,Clinic Plus Shampoo 340 ml,22,165,Personal Care,piece,148,4
+2000000000367,Head & Shoulders 340 ml,16,285,Personal Care,piece,260,3
+2000000000374,Gillette Guard Razor,30,25,Personal Care,piece,20,6
+2000000000381,Surf Excel Easy Wash 1 kg,26,150,Home Care,pack,136,5
+2000000000398,Rin Detergent Bar 250 g,60,22,Home Care,piece,18,12
+2000000000404,Vim Dishwash Bar 300 g,48,30,Home Care,piece,25,10
+2000000000411,Harpic Toilet Cleaner 1 L,18,190,Home Care,piece,172,4
+2000000000428,Lizol Floor Cleaner 975 ml,15,205,Home Care,piece,186,3
+2000000000435,Good Knight Refill 45 ml,34,85,Home Care,piece,74,6
+2000000000442,Whisper Ultra 15 pads,20,165,Personal Care,pack,149,4
+2000000000459,Pampers Diapers M 42,8,799,Baby Care,pack,730,2
+2000000000466,Johnson's Baby Powder 200 g,12,195,Baby Care,piece,176,3
+2000000000473,Dettol Antiseptic 550 ml,14,235,Health,piece,214,3
+2000000000480,Band-Aid Strips 20,25,45,Health,pack,38,5
+2000000000497,Fresh Onions,40,32,Vegetables,kg,24,8
+2000000000503,Fresh Potatoes,50,26,Vegetables,kg,19,10
+2000000000510,Fresh Tomatoes,25,40,Vegetables,kg,30,5
+2000000000527,Green Chillies,6,80,Vegetables,kg,60,1
+2000000000534,Bananas (Robusta),12,60,Fruits,kg,45,3
+2000000000541,Apples (Shimla),10,180,Fruits,kg,150,2
+2000000000558,Farm Eggs (dozen),30,84,Dairy,pack,74,6
+2000000000565,Loose Peanuts,15,140,Dry Fruits,kg,118,3
+2000000000572,Cashew Nuts W320,5,900,Dry Fruits,kg,820,1
+2000000000589,Almonds (Badam),6,750,Dry Fruits,kg,690,1
+2000000000596,Classmate Notebook 172 pg,40,65,Stationery,piece,54,8
+2000000000602,Reynolds 045 Pen (10),25,60,Stationery,pack,50,5
+2000000000619,Duracell AA Batteries (4),18,220,Electricals,pack,195,4
+2000000000626,Philips LED Bulb 9 W,24,95,Electricals,piece,82,5
+2000000000633,Cotton Wicks (pack),30,15,Puja Items,pack,11,6
+2000000000640,Cycle Agarbatti 3-in-1,35,70,Puja Items,pack,60,6
+2000000000657,Camphor Tablets 50 g,20,45,Puja Items,piece,38,4

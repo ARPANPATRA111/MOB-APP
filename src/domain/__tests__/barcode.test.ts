@@ -2,7 +2,10 @@ import {
   barcodesEquivalent,
   canonicalBarcode,
   classifyBarcode,
+  ean13CheckDigit,
+  generateInStoreBarcode,
   isChecksumValid,
+  isInStoreCode,
   sanitizeBarcode,
 } from '../barcode';
 
@@ -75,5 +78,24 @@ describe('classification', () => {
     const result = classifyBarcode('12345');
     expect(result.suspicious).toBe(true);
     expect(result.reason).toMatch(/length/i);
+  });
+});
+
+describe('in-store numbers', () => {
+  it('computes GS1 check digits', () => {
+    expect(ean13CheckDigit('400638133393')).toBe(1);
+    expect(ean13CheckDigit('890123456789')).toBe(0);
+    expect(() => ean13CheckDigit('123')).toThrow();
+  });
+
+  it('generates valid EAN-13s in the restricted range', () => {
+    let n = 0;
+    const code = generateInStoreBarcode(() => ((n += 7) % 10) / 10);
+    expect(code).toHaveLength(13);
+    expect(code.startsWith('20')).toBe(true);
+    expect(isChecksumValid(code)).toBe(true);
+    expect(isInStoreCode(code)).toBe(true);
+    expect(isInStoreCode('8901234567890')).toBe(false);
+    expect(classifyBarcode(code).suspicious).toBe(false);
   });
 });

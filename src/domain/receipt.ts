@@ -3,16 +3,15 @@ import type { SaleRecord } from '../repositories/saleRepository';
 import { fromCents } from './money';
 import { DEFAULT_CURRENCY_CODE, formatCurrency } from './currency';
 import { INVOICE_BRANDING } from './branding';
-
 export interface ReceiptLine {
   name: string;
+  unit?: string;
   quantity: number;
   unitPrice: number;
   discount: number;
   tax: number;
   total: number;
 }
-
 export interface ReceiptData {
   saleId: string;
   saleNumber: string;
@@ -32,9 +31,13 @@ export interface ReceiptData {
   discount: number;
   tax: number;
   total: number;
+  paid?: number;
+  due?: number;
+  change?: number;
+  dueDate?: string;
+  payments?: { method: string; amount: number; date: string; reference?: string }[];
   items: ReceiptLine[];
 }
-
 export const formatReceiptData = (
   sale: SaleRecord,
   businessProfile?: BusinessProfile | null
@@ -44,20 +47,34 @@ export const formatReceiptData = (
   date: new Date(sale.saleDate).toLocaleString(),
   customerName: sale.customerName || 'Walk-in',
   customerPhone: sale.customerPhone,
-  paymentSummary: sale.payments.map((payment) => payment.method).join(', ') || 'Cash',
+  paymentSummary: [...new Set(sale.payments.map((payment) => payment.method))].join(', ') || 'Credit',
   businessName: businessProfile?.businessName || 'MOPX Store',
   ownerName: businessProfile?.ownerName,
   businessAddress: businessProfile?.address,
   businessPhone: businessProfile?.phone,
   gstin: businessProfile?.gstin,
   footerMessage: businessProfile?.receiptFooter || 'Thank you for your purchase.',
-  currencyCode: businessProfile?.currencyCode || DEFAULT_CURRENCY_CODE,
+  currencyCode: sale.currencyCode || businessProfile?.currencyCode || DEFAULT_CURRENCY_CODE,
   subtotal: fromCents(sale.subtotalCents),
   discount: fromCents(sale.discountCents),
   tax: fromCents(sale.taxCents),
   total: fromCents(sale.totalCents),
+  paid: fromCents(sale.paidCents ?? sale.payments.reduce((sum, p) => sum + p.amount_cents, 0)),
+  due: fromCents(
+    sale.dueCents ??
+      Math.max(0, sale.totalCents - sale.payments.reduce((sum, p) => sum + p.amount_cents, 0))
+  ),
+  change: fromCents(sale.changeCents ?? 0),
+  dueDate: sale.dueDate ? new Date(sale.dueDate).toLocaleDateString() : undefined,
+  payments: sale.payments.map((p) => ({
+    method: p.method,
+    amount: fromCents(p.amount_cents),
+    date: new Date(p.paid_at ?? sale.saleDate).toLocaleString(),
+    reference: p.reference,
+  })),
   items: sale.items.map((item) => ({
     name: item.product_name,
+    unit: item.unit,
     quantity: item.quantity,
     unitPrice: fromCents(item.unit_price_cents),
     discount: fromCents(item.discount_cents),
@@ -65,15 +82,21 @@ export const formatReceiptData = (
     total: fromCents(item.total_cents),
   })),
 });
-
-const escapeHtml = (value: string | null | undefined): string => (
+const escapeHtml = (value: string | null | undefined): string =>
   String(value ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-);
+    .replace(/'/g, '&#39;');
+/**
+ * Inline SVG glyphs for the shop address and phone. The PDF is rendered by the
+ * platform WebView, whose fonts do not reliably include emoji, so the icons are
+ * drawn as paths and inherit the muted text colour.
+ */
+const ICON_STYLE = 'width:12px;height:12px;vertical-align:-2px;margin-right:4px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round';
+const PIN_ICON = `<svg style="${ICON_STYLE}" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6-5.3-6-11a6 6 0 0 1 12 0c0 5.7-6 11-6 11z"/><circle cx="12" cy="10" r="2.2"/></svg>`;
+const PHONE_ICON = `<svg style="${ICON_STYLE}" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg>`;
 
 export const createReceiptHtml = (receipt: ReceiptData): string => {
   const money = (value: number) => escapeHtml(formatCurrency(value, receipt.currencyCode));
@@ -106,8 +129,8 @@ export const createReceiptHtml = (receipt: ReceiptData): string => {
         <div class="brand">
           <h1>${escapeHtml(receipt.businessName)}</h1>
           ${receipt.ownerName ? `<div class="muted">Owner: ${escapeHtml(receipt.ownerName)}</div>` : ''}
-        ${receipt.businessAddress ? `<div class="muted">${escapeHtml(receipt.businessAddress)}</div>` : ''}
-        ${receipt.businessPhone ? `<div class="muted">${escapeHtml(receipt.businessPhone)}</div>` : ''}
+        ${receipt.businessAddress ? `<div class="muted">${PIN_ICON}${escapeHtml(receipt.businessAddress)}</div>` : ''}
+        ${receipt.businessPhone ? `<div class="muted">${PHONE_ICON}${escapeHtml(receipt.businessPhone)}</div>` : ''}
         ${receipt.gstin ? `<div class="muted">GSTIN: ${escapeHtml(receipt.gstin)}</div>` : ''}
         </div>
         <div class="invoice-title">
@@ -140,17 +163,21 @@ export const createReceiptHtml = (receipt: ReceiptData): string => {
           </tr>
         </thead>
         <tbody>
-          ${receipt.items.map((item, index) => `
+          ${receipt.items
+            .map(
+              (item, index) => `
             <tr>
               <td>${index + 1}</td>
               <td>${escapeHtml(item.name)}</td>
-              <td class="num">${item.quantity}</td>
+              <td class="num">${item.quantity} ${escapeHtml(item.unit)}</td>
               <td class="num">${money(item.unitPrice)}</td>
               <td class="num">${item.discount ? money(item.discount) : '-'}</td>
               <td class="num">${item.tax ? money(item.tax) : '-'}</td>
               <td class="num">${money(item.total)}</td>
             </tr>
-          `).join('')}
+          `
+            )
+            .join('')}
         </tbody>
       </table>
       <div class="divider"></div>
@@ -159,7 +186,13 @@ export const createReceiptHtml = (receipt: ReceiptData): string => {
         <div class="row"><span>Discount</span><span>${money(receipt.discount)}</span></div>
         <div class="row"><span>Tax</span><span>${money(receipt.tax)}</span></div>
         <div class="row total"><span>Grand Total</span><span>${money(receipt.total)}</span></div>
+        <div class="row"><span>Paid to date</span><span>${money(receipt.paid ?? receipt.total)}</span></div>
+        <div class="row"><span>Remaining balance</span><span>${money(receipt.due ?? 0)}</span></div>
+        <div class="row"><span>Cash change returned</span><span>${money(receipt.change ?? 0)}</span></div>
+        ${receipt.dueDate ? `<div class="row"><span>Due date</span><span>${escapeHtml(receipt.dueDate)}</span></div>` : ''}
       </div>
+      <h3>Payment history</h3>
+      ${(receipt.payments ?? []).map((p) => `<div class="row"><span>${escapeHtml(p.date)} &middot; ${escapeHtml(p.method)} ${escapeHtml(p.reference)}</span><span>${money(p.amount)}</span></div>`).join('')}
       <div class="footer">
         <strong>Thank you.</strong><br/>
         ${escapeHtml(receipt.footerMessage)}<br/>

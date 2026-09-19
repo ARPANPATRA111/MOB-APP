@@ -54,3 +54,9 @@ prompt.txt
 !android/app/debug.keystore
 keystore.properties
 credentials.json
+
+# Generated local module and verification artifacts
+modules/**/android/build/
+modules/**/android/.gradle/
+output/
+.codex-tmp/

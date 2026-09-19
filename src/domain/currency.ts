@@ -16,22 +16,79 @@ export interface CurrencyOption {
    * Drives both digit grouping and the compact suffixes.
    */
   indianGrouping?: boolean;
+  /** Fraction digits shown (default 2). Zero-decimal currencies pass 0. */
+  decimals?: number;
 }
 
 export const DEFAULT_CURRENCY_CODE = 'INR';
 
+/**
+ * Common shop currencies worldwide. Symbols follow local convention; codes
+ * without a compact symbol use the ISO code with a trailing space. Zero-decimal
+ * currencies (JPY, KRW, VND…) still store cents internally but are shown whole.
+ */
 export const CURRENCIES: CurrencyOption[] = [
   { code: 'INR', symbol: '₹', label: 'Indian Rupee', indianGrouping: true },
   { code: 'USD', symbol: '$', label: 'US Dollar' },
   { code: 'EUR', symbol: '€', label: 'Euro' },
   { code: 'GBP', symbol: '£', label: 'British Pound' },
   { code: 'AED', symbol: 'AED ', label: 'UAE Dirham' },
+  { code: 'SAR', symbol: 'SAR ', label: 'Saudi Riyal' },
+  { code: 'QAR', symbol: 'QAR ', label: 'Qatari Riyal' },
+  { code: 'KWD', symbol: 'KD ', label: 'Kuwaiti Dinar' },
+  { code: 'BHD', symbol: 'BD ', label: 'Bahraini Dinar' },
+  { code: 'OMR', symbol: 'OMR ', label: 'Omani Rial' },
   { code: 'AUD', symbol: 'A$', label: 'Australian Dollar' },
+  { code: 'NZD', symbol: 'NZ$', label: 'New Zealand Dollar' },
   { code: 'CAD', symbol: 'C$', label: 'Canadian Dollar' },
   { code: 'SGD', symbol: 'S$', label: 'Singapore Dollar' },
+  { code: 'MYR', symbol: 'RM ', label: 'Malaysian Ringgit' },
+  { code: 'THB', symbol: '฿', label: 'Thai Baht' },
+  { code: 'IDR', symbol: 'Rp ', label: 'Indonesian Rupiah', decimals: 0 },
+  { code: 'PHP', symbol: '₱', label: 'Philippine Peso' },
+  { code: 'VND', symbol: '₫', label: 'Vietnamese Dong', decimals: 0 },
+  { code: 'JPY', symbol: '¥', label: 'Japanese Yen', decimals: 0 },
+  { code: 'KRW', symbol: '₩', label: 'South Korean Won', decimals: 0 },
+  { code: 'CNY', symbol: '¥', label: 'Chinese Yuan' },
+  { code: 'HKD', symbol: 'HK$', label: 'Hong Kong Dollar' },
+  { code: 'TWD', symbol: 'NT$', label: 'New Taiwan Dollar' },
+  { code: 'PKR', symbol: 'Rs. ', label: 'Pakistani Rupee' },
+  { code: 'BDT', symbol: '৳', label: 'Bangladeshi Taka' },
   { code: 'LKR', symbol: 'Rs. ', label: 'Sri Lankan Rupee' },
   { code: 'NPR', symbol: 'Rs. ', label: 'Nepalese Rupee' },
+  { code: 'MVR', symbol: 'Rf ', label: 'Maldivian Rufiyaa' },
+  { code: 'CHF', symbol: 'CHF ', label: 'Swiss Franc' },
+  { code: 'SEK', symbol: 'kr ', label: 'Swedish Krona' },
+  { code: 'NOK', symbol: 'kr ', label: 'Norwegian Krone' },
+  { code: 'DKK', symbol: 'kr ', label: 'Danish Krone' },
+  { code: 'PLN', symbol: 'zł ', label: 'Polish Zloty' },
+  { code: 'CZK', symbol: 'Kč ', label: 'Czech Koruna' },
+  { code: 'HUF', symbol: 'Ft ', label: 'Hungarian Forint', decimals: 0 },
+  { code: 'RON', symbol: 'lei ', label: 'Romanian Leu' },
+  { code: 'TRY', symbol: '₺', label: 'Turkish Lira' },
+  { code: 'RUB', symbol: '₽', label: 'Russian Ruble' },
+  { code: 'UAH', symbol: '₴', label: 'Ukrainian Hryvnia' },
+  { code: 'ILS', symbol: '₪', label: 'Israeli Shekel' },
+  { code: 'EGP', symbol: 'E£', label: 'Egyptian Pound' },
+  { code: 'MAD', symbol: 'MAD ', label: 'Moroccan Dirham' },
+  { code: 'NGN', symbol: '₦', label: 'Nigerian Naira' },
+  { code: 'GHS', symbol: 'GH₵', label: 'Ghanaian Cedi' },
+  { code: 'KES', symbol: 'KSh ', label: 'Kenyan Shilling' },
+  { code: 'TZS', symbol: 'TSh ', label: 'Tanzanian Shilling', decimals: 0 },
+  { code: 'UGX', symbol: 'USh ', label: 'Ugandan Shilling', decimals: 0 },
+  { code: 'ETB', symbol: 'Br ', label: 'Ethiopian Birr' },
+  { code: 'ZAR', symbol: 'R ', label: 'South African Rand' },
+  { code: 'MXN', symbol: 'MX$', label: 'Mexican Peso' },
+  { code: 'BRL', symbol: 'R$', label: 'Brazilian Real' },
+  { code: 'ARS', symbol: 'AR$', label: 'Argentine Peso' },
+  { code: 'CLP', symbol: 'CLP$', label: 'Chilean Peso', decimals: 0 },
+  { code: 'COP', symbol: 'COL$', label: 'Colombian Peso', decimals: 0 },
+  { code: 'PEN', symbol: 'S/ ', label: 'Peruvian Sol' },
 ];
+
+/** Picker label such as `₹ INR`; codes without a distinct symbol show once. */
+export const currencyPickerLabel = (c: CurrencyOption): string =>
+  c.symbol.trim() === c.code ? c.code : `${c.symbol.trim()} ${c.code}`;
 
 const CURRENCY_BY_CODE = new Map(CURRENCIES.map((entry) => [entry.code, entry]));
 
@@ -67,7 +124,7 @@ export const formatCurrency = (
 ): string => {
   const currency = resolveCurrency(code);
   const safeValue = Number.isFinite(value) ? value : 0;
-  const decimals = options.decimals === false ? 0 : 2;
+  const decimals = options.decimals === false ? 0 : (currency.decimals ?? 2);
   const sign = safeValue < 0 ? '-' : '';
   return `${sign}${currency.symbol}${groupDigits(safeValue, Boolean(currency.indianGrouping), decimals)}`;
 };

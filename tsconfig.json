@@ -3,7 +3,15 @@
   "compilerOptions": {
     "strict": false,
     "types": [
-      "jest"
+      "jest",
+      "node"
     ]
-  }
+  },
+  "exclude": [
+    "node_modules",
+    "output",
+    "dist",
+    ".expo",
+    ".codex-tmp"
+  ]
 }
