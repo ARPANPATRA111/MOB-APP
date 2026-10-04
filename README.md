@@ -1,3 +1,13 @@
+> [!IMPORTANT]
+> **Note from the developer: this repository is archived.**
+>
+> This repository is no longer maintained and is read-only. No further changes will be pushed here, and issues or pull requests will not be reviewed.
+>
+> MOPX is now closed source. Newer versions are developed privately and published on Google Play:
+> [MOPX on Google Play](https://play.google.com/store/apps/details?id=com.arpanpatra.mopx)
+>
+> The code below is kept public for reference only and shows the project as it was before it moved to closed source. No licence is granted to reuse, copy or redistribute it; all rights are reserved.
+
 # MOPX - Retail POS & Inventory
 
 MOPX is an offline-first retail POS and inventory app for small vendors, shopkeepers, kiosks, and local retailers. It is built with React Native and Expo and focuses on practical store workflows: product entry, barcode-assisted lookup, inventory, billing, receipts, reports, theme preference, and local backup/export.
