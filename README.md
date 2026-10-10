@@ -5,7 +5,9 @@
 >
 > MOPX is now closed source. Newer versions are developed privately and published on Google Play:
 > [MOPX on Google Play](https://play.google.com/store/apps/details?id=com.arpanpatra.mopx)
->
+
+> Website : [MOPX](https://mopx.me)
+
 > The code below is kept public for reference only and shows the project as it was before it moved to closed source. No licence is granted to reuse, copy or redistribute it; all rights are reserved.
 
 # MOPX - Retail POS & Inventory
